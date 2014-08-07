@@ -9,6 +9,24 @@ m = transplant.Matlab()
 m.eval("disp('Hello, World!')")
 ```
 
+HOW DOES IT WORK?
+-----------------
+
+Transplant opens Matlab as a subprocess, then connects both ends via 0MQ in a request-response pattern. Matlab then runs the _transplant_ server and starts listening for messages. Now, Python can send messages to Matlab, and Matlab will respond.
+
+All messages are JSON-encoded objects, with a `type` and some `content`. This way, Python can ask for different things, and Matlab can answer with different items. For example, Python might ask for a function to be executed, and Matlab might answer with either a return value, or an error.
+
+TODO
+----
+
+- Implement `set_value` message.
+- Implement `get_value` message.
+- Implement `call_function` message.
+- Implement `import` message.
+
+- Implement _transplant_ servers in Julia and PyPy.
+- Implement _transplant_ clients in Python, Julia, PyPy and Matlab.
+
 INSTALLATION
 ------------
 
@@ -17,6 +35,8 @@ INSTALLATION
 2. Install [JSONlab](http://iso2mesh.sourceforge.net/cgi-bin/index.cgi?jsonlab), an implementation of JSON for Matlab. Install this into the subdirectory _jsonlab_ inside this directory.
 
 3. Make sure that `matlab` is reachable in your shell. Transplant will try to start Matlab as a sub-process.
+
+4. On the Python side, make sure to have PyZMQ installed as well. 
 
 LICENSE
 -------
