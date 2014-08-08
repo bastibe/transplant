@@ -6,7 +6,8 @@ Transplant is an easy way of calling Matlab from Python.
 ```python
 import transplant
 m = transplant.Matlab()
-m.eval("disp('Hello, World!')")
+m.put("name", "Matlab")
+m.eval("disp(['Hello, ' name '!'])")
 ```
 
 HOW DOES IT WORK?
@@ -14,13 +15,11 @@ HOW DOES IT WORK?
 
 Transplant opens Matlab as a subprocess, then connects both ends via 0MQ in a request-response pattern. Matlab then runs the _transplant_ server and starts listening for messages. Now, Python can send messages to Matlab, and Matlab will respond.
 
-All messages are JSON-encoded objects, with a `type` and some `content`. This way, Python can ask for different things, and Matlab can answer with different items. For example, Python might ask for a function to be executed, and Matlab might answer with either a return value, or an error.
+All messages are JSON-encoded objects, with a `type` and `type`-dependant other keys. This way, Python can ask for different things, and Matlab can answer with different items. For example, Python might ask for a function to be executed, and Matlab might answer with either a return value, or an error.
 
 TODO
 ----
 
-- Implement `set_value` message.
-- Implement `get_value` message.
 - Implement `call_function` message.
 - Implement `import` message.
 

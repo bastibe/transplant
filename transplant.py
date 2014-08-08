@@ -7,15 +7,20 @@ import zmq
 
 It can start and connect Matlab servers and send them messages. All
 messages are JSON-encoded strings. All messages are dictionaries with
-two keys: 'type' and 'content'.
+at least one key: 'type'.
+
+Depending on the message type, other keys may or may not be set.
 
 These message types are implemented:
 - 'eval': the server evaluates the content of the message.
 - 'die': the server closes its 0MQ session and quits.
+- 'put': saves the 'value' as a global variable called 'name'.
+- 'get': retrieves the global variable 'name'.
 
 These response types are implemented:
 - 'ack': the server received the message successfully.
 - 'error': there was an error while handling the message.
+- 'value': returns a value.
 
 """
 
@@ -32,21 +37,28 @@ class Matlab:
         self.process = Popen(['matlab',
                               '-r', "transplant {}".format('ipc://' + self.ipcfile.name)])
 
-    def eval(self, msg_content):
+    def eval(self, string):
         """Send some code to Matlab to execute."""
-        result = self.send_message('eval', msg_content)
-        if result['type'] == 'error':
-            raise RuntimeError(result['content'])
-        elif result['content']:
-            return result['content']
+        self.send_message('eval', string=string)
+
+    def put(self, name, value):
+        """Save a named variable."""
+        self.send_message('put', name=name, value=value)
+
+    def get(self, name):
+        """Retrieve a named variable."""
+        result = self.send_message('get', name=name)
+        return result['value']
 
     def __del__(self):
         """Close the connection, and kill the process."""
         self.send_message('die')
         self.process.terminate()
 
-    def send_message(self, msg_type, msg_content=''):
+    def send_message(self, msg_type, **kwargs):
         """Send a message and return the response"""
-        self.socket.send_json({'type':msg_type,
-                               'content':msg_content})
-        return self.socket.recv_json()
+        self.socket.send_json(dict(kwargs, type=msg_type))
+        result = self.socket.recv_json()
+        if result['type'] == 'error':
+            raise RuntimeError('Error in Matlab: {message} ({identifier})'.format(**result))
+        return result
