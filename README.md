@@ -8,6 +8,7 @@ import transplant
 m = transplant.Matlab()
 m.put("name", "Matlab")
 m.eval("disp(['Hello, ' name '!'])")
+max, idx = m.call("max", [ [1, 2, 3] ]) # max([1 2 3])
 ```
 
 HOW DOES IT WORK?
@@ -20,11 +21,9 @@ All messages are JSON-encoded objects, with a `type` and `type`-dependant other 
 TODO
 ----
 
-- Implement `call_function` message.
-- Implement `import` message.
-
 - Implement _transplant_ servers in Julia and PyPy.
 - Implement _transplant_ clients in Python, Julia, PyPy and Matlab.
+- Implement `import` message for non-Matlabs.
 
 INSTALLATION
 ------------

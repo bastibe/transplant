@@ -16,6 +16,7 @@ These message types are implemented:
 - 'die': the server closes its 0MQ session and quits.
 - 'put': saves the 'value' as a global variable called 'name'.
 - 'get': retrieves the global variable 'name'.
+- 'call': call function 'name' with 'args' and 'nargout'.
 
 These response types are implemented:
 - 'ack': the server received the message successfully.
@@ -34,7 +35,7 @@ class Matlab:
         self.context = zmq.Context.instance()
         self.socket = self.context.socket(zmq.REQ)
         self.socket.bind('ipc://' + self.ipcfile.name)
-        self.process = Popen(['matlab',
+        self.process = Popen(['matlab', '-nodesktop', '-nosplash',
                               '-r', "transplant {}".format('ipc://' + self.ipcfile.name)])
 
     def eval(self, string):
@@ -47,8 +48,16 @@ class Matlab:
 
     def get(self, name):
         """Retrieve a named variable."""
-        result = self.send_message('get', name=name)
-        return result['value']
+        response = self.send_message('get', name=name)
+        return response['value']
+
+    def call(self, name, args, nargout=-1):
+        """Call a Matlab function."""
+        args.append('dummy') # force non-numeric
+        response = self.send_message('call', name=name, args=args,
+                                     nargout=nargout)
+        if response['type'] == 'value':
+            return response['value']
 
     def __del__(self):
         """Close the connection, and kill the process."""
@@ -58,7 +67,25 @@ class Matlab:
     def send_message(self, msg_type, **kwargs):
         """Send a message and return the response"""
         self.socket.send_json(dict(kwargs, type=msg_type))
-        result = self.socket.recv_json()
-        if result['type'] == 'error':
-            raise RuntimeError('Error in Matlab: {message} ({identifier})'.format(**result))
-        return result
+        response = self.socket.recv_json()
+        if response['type'] == 'error':
+            # Create a pretty backtrace almost like Python's:
+            trace = 'Traceback (most recent call last):\n'
+            for frame in reversed(response['stack']):
+                trace += '  File "{file}", line {line}, in {name}\n'.format(**frame)
+                trace += '    ' + open(frame['file'], 'r').readlines()[frame['line']-1].strip(' ')
+            raise RuntimeError('{message} ({identifier})\n'.format(**response) + trace)
+        return response
+
+
+if __name__ == '__main__':
+    m = Matlab()
+    m.put('name', 'Matlab')
+    m.eval("disp(['Hello, ' name '!'])")
+    print('size([1 2 3]) = ', m.call('size', [[1, 2, 3]]))
+    print('deal(1, 2) = ', m.call('deal', [1, 2], nargout=2))
+    print('max([1 2 3]) = ', m.call('max', [[1, 2, 3]]), '(no nargout)')
+    print('max([1 2 3]) = ', m.call('max', [[1, 2, 3]], nargout=0), '(nargout = 0)')
+    print('max([1 2 3]) = ', m.call('max', [[1, 2, 3]], nargout=1), '(nargout = 1)')
+    print('max([1 2 3]) = ', m.call('max', [[1, 2, 3]], nargout=2), '(nargout = 2)')
+    m.eval("plot(randn(100,1)); drawnow();")

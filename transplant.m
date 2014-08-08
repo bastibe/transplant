@@ -12,6 +12,7 @@
 %    - 'die': closes the 0MQ session and quits Matlab.
 %    - 'put': saves the 'value' as a global variable called 'name'.
 %    - 'get': retrieve the global variable 'name'.
+%    - 'call': call function 'name' with 'args' and 'nargout'.
 %
 %    TRANSPLANT implements the following responses:
 %    - 'ack': received message successfully.
@@ -21,9 +22,10 @@
 function transplant(url)
     addpath('jsonlab')
 
+    % start 0MQ:
     messenger('open', url)
 
-    while 1
+    while 1 % main messaging loop
 
         msg = receive_msg();
 
@@ -40,6 +42,35 @@ function transplant(url)
                     send_ack();
                 case 'get'
                     send_value(evalin('base', msg.name));
+                case 'call'
+                    fun = evalin('base', ['@' msg.name]);
+                    % args always ends with 'dummy', to prevent loadjson
+                    % from converting it to a matrix. Strip 'dummy':
+                    args = msg.args(1:end-1);
+
+                    % get the number of output arguments
+                    if isfield(msg, 'nargout') && msg.nargout >= 0
+                        resultsize = msg.nargout;
+                    else
+                        resultsize = nargout(fun);
+                    end
+
+                    if resultsize > 0
+                        % call the function with the given number of
+                        % output arguments:
+                        results = cell(resultsize, 1);
+                        [results{:}] = fun(args{:});
+                        send_value(results);
+                    else
+                        % try to get output from ans:
+                        clear('ans');
+                        fun(args{:});
+                        try
+                            send_value(ans);
+                        catch err
+                            send_ack();
+                        end
+                    end
                 end
         catch err
             send_error(err)
@@ -70,12 +101,15 @@ end
 
 % Send an error message
 function send_error(err)
-    send_msg('error', struct('identifier', err.identifier, ...
-                             'message', err.message))
+    msg.identifier = err.identifier;
+    msg.message = err.message;
+    msg.stack = err.stack;
+    send_msg('error', msg);
 end
 
 
 % Send a value message
 function send_value(value)
-    send_msg('value', struct('value', value))
+    msg.value = value;
+    send_msg('value', msg);
 end
