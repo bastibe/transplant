@@ -40,19 +40,30 @@ class Matlab:
 
     def eval(self, string):
         """Send some code to Matlab to execute."""
-        self.send_message('eval', string=string)
+        response = self.send_message('eval', string=string)
+        if response['type'] == 'value':
+            return response['value']
 
     def put(self, name, value):
         """Save a named variable."""
         self.send_message('put', name=name, value=value)
 
     def get(self, name):
-        """Retrieve a named variable."""
+        """Retrieve a variable."""
         response = self.send_message('get', name=name)
         return response['value']
 
+    def __getattr__(self, name):
+        """Retrieve a value or function from Matlab."""
+        type = self.call('exist', [name], nargout=1)
+        if type == 1:
+            return self.get(name)
+        elif type in (2, 3, 5, 6):
+            return lambda *args: self.call(name, args, nargout=-1)
+
     def call(self, name, args, nargout=-1):
         """Call a Matlab function."""
+        args = list(args)
         args.append('dummy') # force non-numeric
         response = self.send_message('call', name=name, args=args,
                                      nargout=nargout)
@@ -71,6 +82,8 @@ class Matlab:
         if response['type'] == 'error':
             # Create a pretty backtrace almost like Python's:
             trace = 'Traceback (most recent call last):\n'
+            if isinstance(response['stack'], dict):
+                response['stack'] = [response['stack']]
             for frame in reversed(response['stack']):
                 trace += '  File "{file}", line {line}, in {name}\n'.format(**frame)
                 trace += '    ' + open(frame['file'], 'r').readlines()[frame['line']-1].strip(' ')

@@ -35,13 +35,24 @@ function transplant(url)
                     send_ack();
                     quit;
                 case 'eval'
+                    % try to get output from ans:
+                    clear('ans');
                     evalin('base', msg.string);
-                    send_ack();
+                    try
+                        send_value(ans);
+                    catch err
+                        send_ack();
+                    end
                 case 'put'
                     assignin('base', msg.name, msg.value);
                     send_ack();
                 case 'get'
-                    send_value(evalin('base', msg.name));
+                    if isempty(evalin('base', ['who(''' msg.name ''')']))
+                       error('TRANSPLANT:undefinedvariable' , ...
+                             ['Undefined variable ''' msg.name '''.']);
+                    end
+                    value = evalin('base', msg.name)
+                    send_value(value);
                 case 'call'
                     fun = evalin('base', ['@' msg.name]);
                     % args always ends with 'dummy', to prevent loadjson

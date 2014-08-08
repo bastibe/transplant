@@ -8,7 +8,7 @@ import transplant
 m = transplant.Matlab()
 m.put("name", "Matlab")
 m.eval("disp(['Hello, ' name '!'])")
-max, idx = m.call("max", [ [1, 2, 3] ]) # max([1 2 3])
+max, idx = m.max([1, 2, 3])
 ```
 
 HOW DOES IT WORK?
