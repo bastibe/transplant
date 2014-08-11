@@ -17,6 +17,9 @@
 % (c) 2014 Bastian Bechtold
 
 function [json] = dumpjson(data)
+    if numel(data) > 10000
+       warning('dumping big data structures to JSON might take a while')
+    end
     json = value(data);
 end
 
