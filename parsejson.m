@@ -4,7 +4,7 @@
 %    from it.
 %    - strings are converted to strings
 %    - numbers are converted to doubles
-%    - true, false are converted to 1, 0
+%    - true, false are converted to logical 1, 0
 %    - null is converted to []
 %    - arrays are converted to cell arrays
 %    - objects are converted to structs
@@ -34,7 +34,7 @@ function [idx] = next(json, idx)
     end
 end
 
-% parses a value and advances idx
+% dispatches based on JSON type
 function [obj, idx] = value(json, idx)
     char = json(idx);
     if char == '"'
@@ -226,7 +226,7 @@ function [obj, idx] = true(json, idx)
                '" (char ' num2str(start) ')']);
     end
     if json(idx:idx+3) == 'true'
-        obj = 1;
+        obj = logical(1);
         idx = idx+4;
     else
         error(['not "true": "' json(start:idx+3) ...
@@ -242,7 +242,7 @@ function [obj, idx] = false(json, idx)
                '" (char ' num2str(start) ')']);
     end
     if json(idx:idx+4) == 'false'
-        obj = 0;
+        obj = logical(0);
         idx = idx+5;
     else
         error(['not "false": "' json(start:idx+4) ...
