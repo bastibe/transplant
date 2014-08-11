@@ -1,4 +1,4 @@
-%PARSEJSON parses a json string into Matlab data
+%PARSEJSON parses a json string into Matlab data structures
 % PARSEJSON(STRING)
 %    reads STRING as JSON data, and creates Matlab data structures
 %    from it.
@@ -12,8 +12,6 @@
 %    In contrast to many other JSON parsers, this one does not try to
 %    convert all-numeric arrays into matrices. Thus, nested data
 %    structures are encoded correctly.
-%    However, there is no way of encoding `true`, `false`, and `null
-%    correctly.
 %
 %    This is a complete implementation of the JSON spec, and invalid
 %    data will generally throw errors.
@@ -25,7 +23,7 @@ function [obj] = parsejson(json)
     [obj, idx] = value(json, idx);
     idx = next(json, idx);
     if idx ~= length(json)+1
-        error(['malformed json at idx ' num2str(idx)])
+        error(['malformed json (char ' num2str(idx) ')']);
     end
 end
 
@@ -54,7 +52,8 @@ function [obj, idx] = value(json, idx)
     elseif char == 'n'
         [obj, idx] = null(json, idx);
     else
-        error(['unrecognized character "' char '" at position ' num2str(idx)]);
+        error(['unrecognized character "' char ...
+               '" (char ' num2str(idx) ')']);
     end
 end
 
@@ -62,7 +61,7 @@ end
 function [obj, idx] = string(json, idx)
     obj = '';
     if json(idx) ~= '"'
-        error('string must start with "');
+        error(['string must start with " (char ' num2str(idx) ')']);
     end
     idx = idx+1;
     while json(idx) ~= '"'
@@ -107,18 +106,20 @@ function [obj, idx] = number(json, idx)
         idx = idx+1;
     elseif any(getchar() == '123456789')
         idx = idx+1;
-        digits()
+        digits();
     else
-        error('number must start with digit')
+        error(['number ' json(start:idx-1) ' must start with digit' ...
+               '(char ' num2str(start) ')']);
     end
     if getchar() == '.'
         idx = idx+1;
         if any(getchar() == '0123456789')
             idx = idx+1;
         else
-            error('no digit after decimal point')
+            error(['no digit after decimal point in ' ...
+                    json(start:idx-1) ' (char ' num2str(start) ')']);
         end
-        digits()
+        digits();
     end
     if getchar() == 'e' || getchar() == 'E'
         idx = idx+1;
@@ -127,9 +128,10 @@ function [obj, idx] = number(json, idx)
         end
         if any(getchar() == '0123456789')
             idx = idx+1;
-            digits()
+            digits();
         else
-            error('no digit in exponent')
+            error(['no digit in exponent of ' json(start:idx-1) ...
+                   ' (char ' num2str(start) ')']);
         end
     end
     obj = str2num(json(start:idx-1));
@@ -151,9 +153,10 @@ end
 
 % parses an object and advances idx
 function [obj, idx] = object(json, idx)
+    start = idx;
     obj = struct();
     if json(idx) ~= '{'
-        error('object must start with {')
+        error(['object must start with "{" (char ' num2str(idx) ')']);
     end
     idx = idx+1;
     idx = next(json, idx);
@@ -164,7 +167,8 @@ function [obj, idx] = object(json, idx)
             if json(idx) == ':'
                 idx = idx+1;
             else
-                error(['malformed object at ' num2str(idx)]);
+                error(['no ":" after object key in "' json(start:idx-1) ...
+                       '" (char ' num2str(idx) ')']);
             end
             idx = next(json, idx);
             [v, idx] = value(json, idx);
@@ -177,7 +181,8 @@ function [obj, idx] = object(json, idx)
             elseif json(idx) == '}'
                 break
             else
-                error(['malformed json at ' num2str(idx)]);
+                error(['no "," or "}" after entry in "' json(start:idx-1) ...
+                       '" (char ' num2str(idx) ')']);
             end
         end
     end
@@ -186,9 +191,10 @@ end
 
 % parses an array and advances idx
 function [obj, idx] = array(json, idx)
+    start = idx;
     obj = {};
     if json(idx) ~= '['
-        error('array must start with [')
+        error(['array must start with "[" (char ' num2str(idx) ')']);
     end
     idx = idx+1;
     idx = next(json, idx);
@@ -204,7 +210,8 @@ function [obj, idx] = array(json, idx)
             elseif json(idx) == ']'
                 break
             else
-                error(['malformed json at ' num2str(idx)]);
+                error(['no "," or "]" after entry in "' json(start:idx-1) ...
+                       '" (char ' num2str(idx) ')']);
             end
         end
     end
@@ -213,30 +220,48 @@ end
 
 % parses true and advances idx
 function [obj, idx] = true(json, idx)
+    start = idx;
+    if length(json) < idx+3
+        error(['not enough data for "true" in "' json(start:end) ...
+               '" (char ' num2str(start) ')']);
+    end
     if json(idx:idx+3) == 'true'
         obj = 1;
         idx = idx+4;
     else
-        error(['malformed json at ' num2str(idx)]);
+        error(['not "true": "' json(start:idx+3) ...
+               '" (char ' num2str(idx) ')']);
     end
 end
 
 % parses false and advances idx
 function [obj, idx] = false(json, idx)
+    start = idx;
+    if length(json) < idx+4
+        error(['not enough data for "false" in "' json(start:end) ...
+               '" (char ' num2str(start) ')']);
+    end
     if json(idx:idx+4) == 'false'
         obj = 0;
         idx = idx+5;
     else
-        error(['malformed json at ' num2str(idx)]);
+        error(['not "false": "' json(start:idx+4) ...
+               '" (char ' num2str(idx) ')']);
     end
 end
 
 % parses null and advances idx
 function [obj, idx] = null(json, idx)
+    start = idx;
+    if length(json) < idx+3
+        error(['not enough data for "null" in "' json(start:end) ...
+               '" (char ' num2str(start) ')']);
+    end
     if json(idx:idx+3) == 'null'
         obj = [];
         idx = idx+4;
     else
-        error(['malformed json at ' num2str(idx)]);
+        error(['not "null": "' json(start:idx+3) ...
+               '" (char ' num2str(idx) ')']);
     end
 end
