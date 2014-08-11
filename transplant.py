@@ -55,16 +55,17 @@ class Matlab:
 
     def __getattr__(self, name):
         """Retrieve a value or function from Matlab."""
-        type = self.call('exist', [name], nargout=1)
+        type, = self.call('exist', [name], nargout=1)
         if type == 1:
             return self.get(name)
         elif type in (2, 3, 5, 6):
             return lambda *args: self.call(name, args, nargout=-1)
+        else:
+            print(name, type)
 
     def call(self, name, args, nargout=-1):
         """Call a Matlab function."""
         args = list(args)
-        args.append('dummy') # force non-numeric
         response = self.send_message('call', name=name, args=args,
                                      nargout=nargout)
         if response['type'] == 'value':
@@ -97,8 +98,8 @@ if __name__ == '__main__':
     m.eval("disp(['Hello, ' name '!'])")
     print('size([1 2 3]) = ', m.call('size', [[1, 2, 3]]))
     print('deal(1, 2) = ', m.call('deal', [1, 2], nargout=2))
-    print('max([1 2 3]) = ', m.call('max', [[1, 2, 3]]), '(no nargout)')
-    print('max([1 2 3]) = ', m.call('max', [[1, 2, 3]], nargout=0), '(nargout = 0)')
-    print('max([1 2 3]) = ', m.call('max', [[1, 2, 3]], nargout=1), '(nargout = 1)')
-    print('max([1 2 3]) = ', m.call('max', [[1, 2, 3]], nargout=2), '(nargout = 2)')
-    m.eval("plot(randn(100,1)); drawnow();")
+    print('size([1 2 3]) = ', m.call('size', [[1, 2, 3]]), '(no nargout)')
+    print('size([1 2 3]) = ', m.call('size', [[1, 2, 3]], nargout=0), '(nargout = 0)')
+    print('size([1 2 3]) = ', m.call('size', [[1, 2, 3]], nargout=1), '(nargout = 1)')
+    print('size([1 2 3]) = ', m.call('size', [[1, 2, 3]], nargout=2), '(nargout = 2)')
+    print(m.help('disp')[0])

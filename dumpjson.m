@@ -56,6 +56,11 @@ end
 
 % dumps a string value as a string
 function [json] = string(data)
+    data = strrep(data, sprintf('\b'), '\b');
+    data = strrep(data, sprintf('\f'), '\f');
+    data = strrep(data, sprintf('\n'), '\n');
+    data = strrep(data, sprintf('\r'), '\r');
+    data = strrep(data, sprintf('\t'), '\t');
     json = sprintf('"%s"', data);
 end
 

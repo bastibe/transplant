@@ -5,11 +5,15 @@ Transplant is an easy way of calling Matlab from Python.
 
 ```python
 import transplant
-m = transplant.Matlab()
-m.put("name", "Matlab")
-m.eval("disp(['Hello, ' name '!'])")
-max, idx = m.max([1, 2, 3])
+matlab = transplant.Matlab()
+matlab.put("name", "Matlab")
+matlab.eval("disp(['Hello, ' name '!'])")
+n, m = matlab.size([1, 2, 3])
+magic = matlab.magic(2)
+print(matlab.help('magic')[0])
 ```
+
+Note that Python lists are converted to cell arrays in Matlab.
 
 HOW DOES IT WORK?
 -----------------
@@ -21,6 +25,7 @@ All messages are JSON-encoded objects, with a `type` and `type`-dependant other 
 TODO
 ----
 
+- implement a way to send numeric matrices.
 - Implement _transplant_ servers in Julia and PyPy.
 - Implement _transplant_ clients in Python, Julia, PyPy and Matlab.
 - Implement `import` message for non-Matlabs.

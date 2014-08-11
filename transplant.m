@@ -20,7 +20,6 @@
 %    - 'value': returns a value.
 
 function transplant(url)
-    addpath('jsonlab')
 
     % start 0MQ:
     messenger('open', url)
@@ -55,9 +54,7 @@ function transplant(url)
                     send_value(value);
                 case 'call'
                     fun = evalin('base', ['@' msg.name]);
-                    % args always ends with 'dummy', to prevent loadjson
-                    % from converting it to a matrix. Strip 'dummy':
-                    args = msg.args(1:end-1);
+                    args = msg.args;
 
                     % get the number of output arguments
                     if isfield(msg, 'nargout') && msg.nargout >= 0
@@ -93,14 +90,14 @@ end
 % Wait for and receive a message
 function msg = receive_msg()
     blob = messenger('receive');
-    msg = loadjson(blob);
+    msg = parsejson(blob);
 end
 
 
 % Send a message
 function send_msg(msg_type, msg)
     msg.type = msg_type;
-    messenger('send', savejson('', msg));
+    messenger('send', dumpjson(msg));
 end
 
 
