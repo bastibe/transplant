@@ -13,19 +13,31 @@ magic = matlab.magic(2)
 print(matlab.help('magic')[0])
 ```
 
-Note that Python lists are converted to cell arrays in Matlab.
+Note that Python lists are converted to cell arrays in Matlab. Matlab matrices are converted to Numpy arrays and vice versa.
 
 HOW DOES IT WORK?
 -----------------
 
 Transplant opens Matlab as a subprocess, then connects both ends via 0MQ in a request-response pattern. Matlab then runs the _transplant_ server and starts listening for messages. Now, Python can send messages to Matlab, and Matlab will respond.
 
-All messages are JSON-encoded objects, with a `type` and `type`-dependant other keys. This way, Python can ask for different things, and Matlab can answer with different items. For example, Python might ask for a function to be executed, and Matlab might answer with either a return value, or an error.
+All messages are JSON-encoded objects. There are five messages types used by Python: 
+
+* `eval` evaluates a string.
+* `put` and `get` set and retrieve a global variable.
+* `call` calls a Matlab function with some function arguments.
+* `die` tells Matlab to shut down.
+
+Matlab can then respond with one of three message types:
+
+* `ack` for successful execution.
+* `value` for a return value.
+* `error` if there was an error during execution.
+
+In addition to the regular JSON data types, _transplant_ uses a specially formatted JSON array for transmitting numerical matrices as binary data. This allows for efficient data exchange and prevents rounding errors.
 
 TODO
 ----
 
-- implement a way to send numeric matrices.
 - Implement _transplant_ servers in Julia and PyPy.
 - Implement _transplant_ clients in Python, Julia, PyPy and Matlab.
 - Implement `import` message for non-Matlabs.

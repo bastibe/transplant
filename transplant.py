@@ -1,6 +1,8 @@
 from subprocess import Popen
 import tempfile
 import zmq
+import numpy as np
+import base64
 
 
 """Transplant is a Python client for remote code execution
@@ -22,6 +24,9 @@ These response types are implemented:
 - 'ack': the server received the message successfully.
 - 'error': there was an error while handling the message.
 - 'value': returns a value.
+
+`put`, `get`, and `call` use a special encoding for matrices. See
+`Matlab.encode_matrices` and `Matlab.decode_matrices` for more detail.
 
 """
 
@@ -59,7 +64,10 @@ class Matlab:
         if type == 1:
             return self.get(name)
         elif type in (2, 3, 5, 6):
-            return lambda *args: self.call(name, args, nargout=-1)
+            def call_matlab(*args):
+                args = self.encode_matrices(args)
+                return self.call(name, args, nargout=-1)
+            return call_matlab
         else:
             print(name, type)
 
@@ -69,7 +77,7 @@ class Matlab:
         response = self.send_message('call', name=name, args=args,
                                      nargout=nargout)
         if response['type'] == 'value':
-            return response['value']
+            return self.decode_matrices(response['value'])
 
     def __del__(self):
         """Close the connection, and kill the process."""
@@ -91,6 +99,65 @@ class Matlab:
             raise RuntimeError('{message} ({identifier})\n'.format(**response) + trace)
         return response
 
+    def encode_matrices(self, data):
+        """Recursively walk through data and encode all matrices as JSON data.
+
+        The matrix `np.array([[1, 2], [3, 4]], dtype='int32')` would
+        be encoded as
+        `["__matrix__", "int32", [2, 2], "AQAAAAIAAAADAAAABAAAA==\n"]`
+
+        where `"int32"` is the data type, `[2, 2]` is the matrix shape
+        and `"AQAAAAIAAAADAAAABAAAA==\n"` is the base64-encoded matrix
+        content.
+
+        """
+
+        if isinstance(data, dict):
+            out = {}
+            for key in data:
+                out[key] = self.encode_matrices(data[key])
+        elif isinstance(data, list) or isinstance(data, tuple):
+            out = list(data)
+            for idx in range(len(data)):
+                out[idx] = self.encode_matrices(data[idx])
+        elif isinstance(data, np.ndarray):
+            out = ["__matrix__", data.dtype.name, data.shape,
+                   base64.encodebytes(data.tostring()).decode()]
+        else:
+            out = data
+        return out
+
+    def decode_matrices(self, data):
+        """Recursively walk through data and decode all matrices to np.ndarray
+
+        The matrix `np.array([[1, 2], [3, 4]], dtype='int32')` would
+        be encoded as
+        `["__matrix__", "int32", [2, 2], "AQAAAAIAAAADAAAABAAAA==\n"]`
+
+        where `"int32"` is the data type, `[2, 2]` is the matrix shape
+        and `"AQAAAAIAAAADAAAABAAAA==\n"` is the base64-encoded matrix
+        content.
+
+        """
+
+        if (isinstance(data, list) and
+            len(data) == 4 and
+            data[0] == "__matrix__"):
+            dtype, shape, data = data[1:]
+            out = np.fromstring(base64.decodebytes(data.encode()), dtype)
+            out.reshape(*shape)
+        elif isinstance(data, dict):
+            out = {}
+            for key in data:
+                out[key] = self.decode_matrices(data[key])
+        elif isinstance(data, list) or isinstance(data, tuple):
+            out = list(data)
+            for idx in range(len(data)):
+                out[idx] = self.decode_matrices(data[idx])
+        else:
+            out = data
+        return out
+
 
 if __name__ == '__main__':
     m = Matlab()
@@ -102,4 +169,6 @@ if __name__ == '__main__':
     print('size([1 2 3]) = ', m.call('size', [[1, 2, 3]], nargout=0), '(nargout = 0)')
     print('size([1 2 3]) = ', m.call('size', [[1, 2, 3]], nargout=1), '(nargout = 1)')
     print('size([1 2 3]) = ', m.call('size', [[1, 2, 3]], nargout=2), '(nargout = 2)')
+    print('max([1 2; 3 4]) = ', m.max(np.array([[1, 2], [3, 4]])))
+    print('max([1 2 3 4+5j]) = ', m.max(np.array([[1, 2, 3, 4+5j]], dtype='complex64')))
     print(m.help('disp')[0])
