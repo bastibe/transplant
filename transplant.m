@@ -153,6 +153,10 @@ function [value] = encode_matrices(value)
             tmp(2:2:end) = imag(value(:));
             binary = typecast(tmp, 'uint8');
         end
+        % prevent nasty java crashes
+        if length(binary)*2 > java.lang.Runtime.getRuntime.freeMemory
+            error('not enough Java heap space to encode matrix');
+        end
         base64 = char(org.apache.commons.codec.binary.Base64.encodeBase64(binary))';
         % translate Matlab class names into numpy dtypes
         if isa(value, 'double') && isreal(value)
@@ -200,6 +204,10 @@ function [value] = decode_matrices(value)
            shape = [1 shape];
         end
         base64 = uint8(value{4});
+        % prevent nasty java crashes
+        if length(base64)*2 > java.lang.Runtime.getRuntime.freeMemory
+            error('not enough Java heap space to decode matrix');
+        end
         binary = org.apache.commons.codec.binary.Base64.decodeBase64(base64);
         % translate numpy dtypes into Matlab class names
         if strcmp(dtype, 'complex128')

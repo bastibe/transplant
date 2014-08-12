@@ -15,6 +15,8 @@ print(matlab.help('magic')[0])
 
 Note that Python lists are converted to cell arrays in Matlab. Matlab matrices are converted to Numpy arrays and vice versa.
 
+The maximum size of matrices that can be transmitted is limited by the Java heap space. Increase your heap space if you need to transmit matrices larger than about 64 Mb.
+
 HOW DOES IT WORK?
 -----------------
 
