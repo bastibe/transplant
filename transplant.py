@@ -69,7 +69,7 @@ class Matlab:
                 return self.call(name, args, nargout=-1)
             return call_matlab
         else:
-            print(name, type)
+            raise NameError("Name '{}' is not defined in Matlab.".format(name))
 
     def call(self, name, args, nargout=-1):
         """Call a Matlab function."""
