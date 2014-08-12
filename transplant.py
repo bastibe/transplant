@@ -34,14 +34,14 @@ These response types are implemented:
 class Matlab:
     """An instance of Matlab, running in its own process."""
 
-    def __init__(self):
+    def __init__(self, matlab='matlab', args=('-nodesktop', '-nosplash')):
         """Starts a Matlab instance and opens a communication channel."""
         self.ipcfile = tempfile.NamedTemporaryFile()
         self.context = zmq.Context.instance()
         self.socket = self.context.socket(zmq.REQ)
         self.socket.bind('ipc://' + self.ipcfile.name)
-        self.process = Popen(['matlab', '-nodesktop', '-nosplash',
-                              '-r', "transplant {}".format('ipc://' + self.ipcfile.name)])
+        self.process = Popen([matlab] + list(args) +
+                             ['-r', "transplant {}".format('ipc://' + self.ipcfile.name)])
 
     def eval(self, string):
         """Send some code to Matlab to execute."""
