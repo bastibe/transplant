@@ -60,7 +60,7 @@ class Matlab:
 
     def __getattr__(self, name):
         """Retrieve a value or function from Matlab."""
-        type, = self.call('exist', [name], nargout=1)
+        type = self.call('exist', [name], nargout=1)
         if type == 1:
             return self.get(name)
         elif type in (2, 3, 5, 6):

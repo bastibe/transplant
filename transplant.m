@@ -73,7 +73,11 @@ function transplant(url)
                         % output arguments:
                         results = cell(resultsize, 1);
                         [results{:}] = fun(args{:});
-                        send_value(results);
+                        if length(results) == 1
+                            send_value(results{1});
+                        else
+                            send_value(results);
+                        end
                     else
                         % try to get output from ans:
                         clear('ans');
