@@ -64,36 +64,40 @@ function [obj, idx] = string(json, idx)
         error(['string must start with " (char ' num2str(idx) ')']);
     end
     idx = idx+1;
-    while json(idx) ~= '"'
-        if json(idx) == '\'
-            idx = idx+1;
-            switch json(idx)
-                case '"'
-                    obj = [obj '"'];
-                case '\'
-                    obj = [obj '\'];
-                case '/'
-                    obj = [obj '/'];
-                case 'b'
-                    obj = [obj sprintf('\b')];
-                case 'f'
-                    obj = [obj sprintf('\f')];
-                case 'n'
-                    obj = [obj sprintf('\n')];
-                case 'r'
-                    obj = [obj sprintf('\r')];
-                case 't'
-                    obj = [obj sprintf('\t')];
-                case 'u'
-                    obj = [obj char(hex2dec(json(idx+1:idx+4)))];
-                    idx = idx+4;
-            end
-        else
-            obj = [obj json(idx)];
-        end
-        idx = idx+1;
+    start = idx;
+    stop = regexp(json(start:end), '(?<!\\)"', 'once');
+    idx = start+stop;
+    obj = json(start:start+stop-2);
+    % check for errors
+    match = regexp(obj, '\\[^trnfbu\\/"]', 'match', 'once');
+    if length(match) > 0
+        error(['string "' obj '" contains illegal escape sequence "' match '")']);
     end
-    idx = idx+1;
+    obj = strrep(obj, '\t', sprintf('\t'));
+    obj = strrep(obj, '\r', sprintf('\r'));
+    obj = strrep(obj, '\n', sprintf('\n'));
+    obj = strrep(obj, '\f', sprintf('\f'));
+    obj = strrep(obj, '\b', sprintf('\b'));
+    obj = strrep(obj, '\/', '/');
+    obj = strrep(obj, '\"', '"');
+    % replace \u09af with char(hex2dec('09af'))
+    matches = regexp(obj, '\\u[0-9a-f]{4}');
+    for uidx=1:length(matches)
+        match_idx = matches(uidx)-5*(uidx-1);
+        match = char(hex2dec(obj(match_idx+2:match_idx+5)));
+        if match_idx == 1
+            before = '';
+        else
+            before = obj(1:match_idx-1);
+        end
+        if match_idx+5 == length(obj)
+            after = '';
+        else
+            after = obj(match_idx+6:end);
+        end
+        obj = [before match after];
+    end
+    obj = strrep(obj, '\\', '\');
 end
 
 % parses a number and advances idx
