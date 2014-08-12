@@ -18,7 +18,8 @@
 
 function [json] = dumpjson(data)
     if numel(data) > 10000
-       warning('dumping big data structures to JSON might take a while')
+       warning('JSON:dump:toomuchdata', ...
+               'dumping big data structures to JSON might take a while')
     end
     json = value(data);
 end
@@ -50,7 +51,8 @@ function [json] = value(data)
             end
         end
     catch err
-        error(['can''t encode ' char(data) ' (' class(data) ') as JSON']);
+        error('JSON:dump:unknowntype', ...
+              ['can''t encode ' char(data) ' (' class(data) ') as JSON']);
     end
 end
 
