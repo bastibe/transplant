@@ -3,6 +3,7 @@ import tempfile
 import zmq
 import numpy as np
 import base64
+import atexit
 
 
 """Transplant is a Python client for remote code execution
@@ -47,6 +48,9 @@ class Matlab:
                              ['-r', "transplant {}".format('ipc://' + self.ipcfile.name)],
                              stdin=DEVNULL, start_new_session=True)
         self.eval('') # wait for Matlab startup to complete
+        # in some cases, the destructor does not work for some reason.
+        # Make sure to definitely kill Matlab at shutdown, at least.
+        atexit.register(self.process.terminate)
 
     def eval(self, string, nargout=-1):
         """Send some code to Matlab to execute."""
