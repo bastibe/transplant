@@ -64,9 +64,9 @@ class Matlab:
         if type == 1:
             return self.get(name)
         elif type in (2, 3, 5, 6):
-            def call_matlab(*args):
+            def call_matlab(*args, nargout=-1):
                 args = self.encode_matrices(args)
-                return self.call(name, args, nargout=-1)
+                return self.call(name, args, nargout=nargout)
             return call_matlab
         else:
             raise NameError("Name '{}' is not defined in Matlab.".format(name))
