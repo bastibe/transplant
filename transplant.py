@@ -1,4 +1,4 @@
-from subprocess import Popen
+from subprocess import Popen, DEVNULL
 import tempfile
 import zmq
 import numpy as np
@@ -34,14 +34,18 @@ These response types are implemented:
 class Matlab:
     """An instance of Matlab, running in its own process."""
 
-    def __init__(self, matlab='matlab', args=('-nodesktop', '-nosplash')):
+    def __init__(self, executable='matlab', arguments=('-nodesktop', '-nosplash')):
         """Starts a Matlab instance and opens a communication channel."""
         self.ipcfile = tempfile.NamedTemporaryFile()
         self.context = zmq.Context.instance()
         self.socket = self.context.socket(zmq.REQ)
         self.socket.bind('ipc://' + self.ipcfile.name)
-        self.process = Popen([matlab] + list(args) +
-                             ['-r', "transplant {}".format('ipc://' + self.ipcfile.name)])
+        # start Matlab, but make sure that it won't eat the REPL stdin
+        # (stdin=DEVNULL), and that it won't respond to signals like
+        # C-c of the REPL (start_new_session=True).
+        self.process = Popen([executable] + list(arguments) +
+                             ['-r', "transplant {}".format('ipc://' + self.ipcfile.name)],
+                             stdin=DEVNULL, start_new_session=True)
         self.eval('') # wait for Matlab startup to complete
 
     def eval(self, string):
