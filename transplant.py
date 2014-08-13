@@ -76,6 +76,13 @@ class Matlab:
         else:
             raise NameError("Name '{}' is not defined in Matlab.".format(name))
 
+    def __setattr__(self, name, value):
+        """Retrieve a value or function from Matlab."""
+        if name in ['ipcfile', 'context', 'socket', 'process']:
+            self.__dict__[name] = value
+        else:
+            self.put(name, value)
+
     def call(self, name, args, nargout=-1):
         """Call a Matlab function."""
         args = list(args)
