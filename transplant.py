@@ -42,6 +42,7 @@ class Matlab:
         self.socket.bind('ipc://' + self.ipcfile.name)
         self.process = Popen([matlab] + list(args) +
                              ['-r', "transplant {}".format('ipc://' + self.ipcfile.name)])
+        self.eval('') # wait for Matlab startup to complete
 
     def eval(self, string):
         """Send some code to Matlab to execute."""
