@@ -39,13 +39,24 @@ function transplant(url)
                     send_ack();
                     quit;
                 case 'eval'
-                    % try to get output from ans:
-                    clear('ans');
-                    evalin('base', msg.string);
-                    try
-                        send_value(ans);
-                    catch err
-                        send_ack();
+                    % get the number of output arguments
+                    if isfield(msg, 'nargout') && msg.nargout >= 0
+                        results = cell(msg.nargout, 1);
+                        [results{:}] = evalin('base', msg.string);
+                        if length(results) == 1
+                            send_value(results{1});
+                        else
+                            send_value(results);
+                        end
+                    else
+                        % try to get output from ans:
+                        clear('ans');
+                        evalin('base', msg.string);
+                        try
+                            send_value(ans);
+                        catch err
+                            send_ack();
+                        end
                     end
                 case 'put'
                     assignin('base', msg.name, decode_matrices(msg.value));

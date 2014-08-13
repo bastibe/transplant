@@ -48,9 +48,9 @@ class Matlab:
                              stdin=DEVNULL, start_new_session=True)
         self.eval('') # wait for Matlab startup to complete
 
-    def eval(self, string):
+    def eval(self, string, nargout=-1):
         """Send some code to Matlab to execute."""
-        response = self.send_message('eval', string=string)
+        response = self.send_message('eval', string=string, nargout=nargout)
         if response['type'] == 'value':
             return response['value']
 
