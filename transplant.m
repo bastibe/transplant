@@ -158,7 +158,10 @@ function [value] = encode_matrices(value)
             binary = typecast(tmp, 'uint8');
         end
         % prevent nasty java crashes
-        if length(binary)*2 > java.lang.Runtime.getRuntime.freeMemory
+        if length(binary)*2.5 > java.lang.Runtime.getRuntime.freeMemory
+            java.lang.Runtime.getRuntime.gc
+        end
+        if length(binary)*2.5 > java.lang.Runtime.getRuntime.freeMemory
             error('TRANSPLANT:java:nomemory', ...
                   'not enough Java heap space to encode matrix');
         end
@@ -210,7 +213,10 @@ function [value] = decode_matrices(value)
         end
         base64 = uint8(value{4});
         % prevent nasty java crashes
-        if length(base64)*2 > java.lang.Runtime.getRuntime.freeMemory
+        if length(base64)*2.5 > java.lang.Runtime.getRuntime.freeMemory
+            java.lang.Runtime.getRuntime.gc
+        end
+        if length(base64)*2.5 > java.lang.Runtime.getRuntime.freeMemory
             error('TRANSPLANT:java:nomemory', ...
                   'not enough Java heap space to decode matrix');
         end
