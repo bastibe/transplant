@@ -188,3 +188,4 @@ if __name__ == '__main__':
     print('max([1 2; 3 4]) = ', m.max(np.array([[1, 2], [3, 4]])))
     print('max([1 2 3 4+5j]) = ', m.max(np.array([[1, 2, 3, 4+5j]], dtype='complex64')))
     print(m.help('disp')[0])
+    del m

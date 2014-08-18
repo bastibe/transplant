@@ -160,7 +160,7 @@ function [value] = encode_matrices(value)
             % convert [complex, complex] into [real, imag, real, imag]
             % since encodeBase64Chunked can only deal with real 1-D
             % arrays.
-            tmp = zeros(1, numel(value)*2);
+            tmp = zeros(numel(value)*2, 1);
             if isa(value, 'single')
                 tmp = single(tmp);
             end
@@ -168,15 +168,7 @@ function [value] = encode_matrices(value)
             tmp(2:2:end) = imag(value(:));
             binary = typecast(tmp, 'uint8');
         end
-        % prevent nasty java crashes
-        if length(binary)*2.5 > java.lang.Runtime.getRuntime.freeMemory
-            java.lang.Runtime.getRuntime.gc
-        end
-        if length(binary)*2.5 > java.lang.Runtime.getRuntime.freeMemory
-            error('TRANSPLANT:java:nomemory', ...
-                  'not enough Java heap space to encode matrix');
-        end
-        base64 = char(org.apache.commons.codec.binary.Base64.encodeBase64(binary))';
+        base64 = base64encode(binary);
         % translate Matlab class names into numpy dtypes
         if isa(value, 'double') && isreal(value)
             dtype = 'float64';
@@ -222,16 +214,7 @@ function [value] = decode_matrices(value)
         if length(shape) == 1
            shape = [1 shape];
         end
-        base64 = uint8(value{4});
-        % prevent nasty java crashes
-        if length(base64)*2.5 > java.lang.Runtime.getRuntime.freeMemory
-            java.lang.Runtime.getRuntime.gc
-        end
-        if length(base64)*2.5 > java.lang.Runtime.getRuntime.freeMemory
-            error('TRANSPLANT:java:nomemory', ...
-                  'not enough Java heap space to decode matrix');
-        end
-        binary = org.apache.commons.codec.binary.Base64.decodeBase64(base64);
+        binary = base64decode(value{4});
         % translate numpy dtypes into Matlab class names
         if strcmp(dtype, 'complex128')
             value = typecast(binary, 'double')';
