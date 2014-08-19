@@ -30,7 +30,7 @@ Will start a Matlab session and connect to it. This will take a few seconds whil
 
 By default, this will try to call `matlab` on the command line. If you want to use a different version of Matlab, or `matlab` is not available on the command line, use `transplant.Matlab(executable='/path/to/matlab')`.
 
-By default, Matlab is called with `-nodesktop` and `-nosplash`, so no IDE or splash screen show up. If you want to use different arguments, you can supply them like this: `transplant.Matlab(arguments=('-nodesktop', '-nosplash', '-c licensefile'))`. Note that `-nojvm` must not be used, since Transplant uses java internally.
+By default, Matlab is called with `-nodesktop` and `-nosplash`, so no IDE or splash screen show up. If you want to use different arguments, you can supply them like this: `transplant.Matlab(arguments=('-nodesktop', '-nosplash', '-c licensefile'))`.
 
 CALLING MATLAB FUNCTIONS
 ------------------------
