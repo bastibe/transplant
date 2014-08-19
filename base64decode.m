@@ -7,7 +7,7 @@
 % (c) 2014 Bastian Bechtold
 
 function bytes = base64decode(base64)
-    base64 = strtrim(base64);
+    base64 = strrep(base64, sprintf('\n'), '');
     padding = sum(base64 == '=');
     table = zeros(1, 128, 'uint8');
     table(['A':'Z' 'a':'z' '0':'9' '+' '/']+0) = 0:63;
