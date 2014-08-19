@@ -30,7 +30,7 @@ Will start a Matlab session and connect to it. This will take a few seconds whil
 
 By default, this will try to call `matlab` on the command line. If you want to use a different version of Matlab, or `matlab` is not available on the command line, use `transplant.Matlab(executable='/path/to/matlab')`.
 
-By default, Matlab is called with `-nodesktop` and `-nosplash`, so no IDE or splash screen show up. If you want to use different arguments, you can supply them like this: `transplant.Matlab(arguments=('-nodesktop', '-nosplash', '-c licensefile'))`.
+By default, Matlab is called with `-nodesktop` and `-nosplash`, so no IDE or splash screen show up. If you want to use different arguments, you can supply them like this: `transplant.Matlab(arguments=('-nodesktop', '-nosplash', '-c licensefile' , '-nojvm'))`. Note that `'-nojvm'` will speed up startup considerably, but you won't be able to plot any more.
 
 CALLING MATLAB FUNCTIONS
 ------------------------
@@ -39,7 +39,7 @@ CALLING MATLAB FUNCTIONS
 matlab.disp("Hello, World")
 ```
 
-Will call Matlab's `disp` function with the argument `'Hello, World'`. It is equivalent to `disp('Hello, World')` in Matlab. Return values will be returned to Python, and errors will be converted to Python errors (a stack trace will be given, too!).
+Will call Matlab's `disp` function with the argument `'Hello, World'`. It is equivalent to `disp('Hello, World')` in Matlab. Return values will be returned to Python, and errors will be converted to Python errors (Matlab stack traces will be given, too!).
 
 Input arguments are converted to Matlab data structures:
 
@@ -83,20 +83,20 @@ Transplant opens Matlab as a subprocess, then connects to it via [0MQ](http://ze
 
 All messages are JSON-encoded objects. There are five messages types used by Python: 
 
-* `eval` evaluates a string.
+* `eval` evaluates a string and returns the result.
 * `put` and `get` set and retrieve a global variable.
-* `call` calls a Matlab function with some function arguments.
+* `call` calls a Matlab function with some function arguments and returns the result.
 * `die` tells Matlab to shut down.
 
 Matlab can then respond with one of three message types:
 
 * `ack` for successful execution.
-* `value` for a return value.
+* `value` for return values.
 * `error` if there was an error during execution.
 
 In addition to the regular JSON data types, _transplant_ uses a specially formatted JSON array for transmitting numerical matrices as binary data. A numerical 2x2 32-bit integer matrix containing `[[1, 2], [3, 4]]` would be encoded as `["__matrix__", "int32", [2, 2], "AQAAAAIAAAADAAAABAAAA==\n"]`, where `"int32"` is the data type, `[2, 2]` is the matrix shape and the long string is the base64-encoded matrix content. This allows for efficient data exchange and prevents rounding errors due to JSON serialization.
 
-The maximum size of matrices that can be transmitted is limited by the Java heap space. Increase your heap space if you need to transmit matrices larger than about 64 Mb.
+Note that this project includes a JSON serializer/parser and a Base64 encoder/decoder in pure Matlab.
 
 TODO
 ----
