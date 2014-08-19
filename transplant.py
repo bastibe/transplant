@@ -161,7 +161,7 @@ class Matlab:
             data[0] == "__matrix__"):
             dtype, shape, data = data[1:]
             out = np.fromstring(base64.decodebytes(data.encode()), dtype)
-            out.reshape(*shape)
+            out = out.reshape(*shape)
         elif isinstance(data, dict):
             out = {}
             for key in data:
@@ -188,4 +188,5 @@ if __name__ == '__main__':
     print('max([1 2; 3 4]) = ', m.max(np.array([[1, 2], [3, 4]])))
     print('max([1 2 3 4+5j]) = ', m.max(np.array([[1, 2, 3, 4+5j]], dtype='complex64')))
     print(m.help('disp')[0])
+    print('eye(3) = ', m.eye(3))
     del m

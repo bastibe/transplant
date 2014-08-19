@@ -229,7 +229,7 @@ function [value] = decode_matrices(value)
         else
             value = typecast(binary, dtype);
         end
-        reshape(value, shape);
+        value = reshape(value, shape);
     elseif iscell(value)
         for idx=1:numel(value)
             value{idx} = decode_matrices(value{idx});
