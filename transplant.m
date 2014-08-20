@@ -189,7 +189,7 @@ function [value] = encode_matrices(value)
             value{idx} = encode_matrices(value{idx});
         end
     elseif isstruct(value)
-        keys = getfields(value);
+        keys = fieldnames(value);
         for idx=1:numel(value)
             for n=1:length(keys)
                 key = keys{n};
@@ -235,7 +235,7 @@ function [value] = decode_matrices(value)
             value{idx} = decode_matrices(value{idx});
         end
     elseif isstruct(value)
-        keys = getfields(value);
+        keys = fieldnames(value);
         for idx=1:numel(value)
             for n=1:length(keys)
                 key = keys{n};
