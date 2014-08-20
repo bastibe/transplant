@@ -4,6 +4,7 @@ import zmq
 import numpy as np
 import base64
 import atexit
+from os.path import dirname
 
 
 """Transplant is a Python client for remote code execution
@@ -45,7 +46,9 @@ class Matlab:
         # (stdin=DEVNULL), and that it won't respond to signals like
         # C-c of the REPL (start_new_session=True).
         self.process = Popen([executable] + list(arguments) +
-                             ['-r', "transplant {}".format('ipc://' + self.ipcfile.name)],
+                             ['-r', "addpath('{}'); transplant {}"
+                              .format(dirname(__file__),
+                                      'ipc://' + self.ipcfile.name)],
                              stdin=DEVNULL, start_new_session=True)
         self.eval('') # wait for Matlab startup to complete
         # in some cases, the destructor does not work for some reason.
