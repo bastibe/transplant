@@ -77,7 +77,6 @@ class Matlab:
             return self.get(name)
         elif type in (2, 3, 5, 6):
             def call_matlab(*args, nargout=-1):
-                args = self.encode_matrices(args)
                 return self.call(name, args, nargout=nargout)
             call_matlab.__doc__, _ = self.call('help', [name])
             return call_matlab
@@ -97,7 +96,7 @@ class Matlab:
         response = self.send_message('call', name=name, args=args,
                                      nargout=nargout)
         if response['type'] == 'value':
-            return self.decode_matrices(response['value'])
+            return response['value']
 
     def __del__(self):
         """Close the connection, and kill the process."""
@@ -106,8 +105,10 @@ class Matlab:
 
     def send_message(self, msg_type, **kwargs):
         """Send a message and return the response"""
+        kwargs = self.encode_matrices(kwargs)
         self.socket.send_json(dict(kwargs, type=msg_type))
         response = self.socket.recv_json()
+        response = self.decode_matrices(response)
         if response['type'] == 'error':
             # Create a pretty backtrace almost like Python's:
             trace = 'Traceback (most recent call last):\n'
