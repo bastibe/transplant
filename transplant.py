@@ -79,7 +79,7 @@ class Matlab:
             def call_matlab(*args, nargout=-1):
                 args = self.encode_matrices(args)
                 return self.call(name, args, nargout=nargout)
-            call_matlab.__doc__ = self.call('help', [name])[0]
+            call_matlab.__doc__, _ = self.call('help', [name])
             return call_matlab
         else:
             raise NameError("Name '{}' is not defined in Matlab.".format(name))
