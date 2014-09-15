@@ -73,15 +73,16 @@ class Matlab:
     def __getattr__(self, name):
         """Retrieve a value or function from Matlab."""
         type = self.call('exist', [name], nargout=1)
-        if type == 1:
-            return self.get(name)
-        elif type in (2, 3, 5, 6):
+        if type in (2, 3, 5, 6):
             def call_matlab(*args, nargout=-1):
                 return self.call(name, args, nargout=nargout)
             call_matlab.__doc__, _ = self.call('help', [name])
             return call_matlab
         else:
-            raise NameError("Name '{}' is not defined in Matlab.".format(name))
+            try:
+                return self.get(name)
+            except Error:
+                raise NameError("Name '{}' is not defined in Matlab.".format(name))
 
     def __setattr__(self, name, value):
         """Retrieve a value or function from Matlab."""
