@@ -50,9 +50,10 @@ function transplant(url)
                         end
                     else
                         % try to get output from ans:
-                        clear('ans');
+                        evalin('base', 'clear ans');
                         evalin('base', msg.string);
                         try
+                            ans = evalin('base', 'ans');
                             send_value(ans);
                         catch err
                             send_ack();
@@ -66,7 +67,7 @@ function transplant(url)
                        error('TRANSPLANT:novariable' , ...
                              ['Undefined variable ''' msg.name '''.']);
                     end
-                    value = evalin('base', msg.name)
+                    value = evalin('base', msg.name);
                     send_value(value);
                 case 'call'
                     fun = evalin('base', ['@' msg.name]);
