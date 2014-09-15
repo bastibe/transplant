@@ -155,6 +155,9 @@ function [value] = encode_matrices(value)
         % integers
         end
         if isreal(value)
+            % convert column-major (FORTRAN, Matlab) to
+            % row-major (C, Python)
+            value = permute(value, length(size(value)):-1:1);
             binary = typecast(value(:), 'uint8');
         else
             % convert [complex, complex] into [real, imag, real, imag]
@@ -164,6 +167,7 @@ function [value] = encode_matrices(value)
             if isa(value, 'single')
                 tmp = single(tmp);
             end
+            value = permute(value, length(size(value)):-1:1);
             tmp(1:2:end) = real(value(:));
             tmp(2:2:end) = imag(value(:));
             binary = typecast(tmp, 'uint8');
@@ -183,7 +187,8 @@ function [value] = encode_matrices(value)
         else
             return % don't encode
         end
-        value = {'__matrix__', dtype, size(value), base64};
+        % save as row-major (C, Python)
+        value = {'__matrix__', dtype, fliplr(size(value)), base64};
     elseif iscell(value)
         for idx=1:numel(value)
             value{idx} = encode_matrices(value{idx});
@@ -229,7 +234,9 @@ function [value] = decode_matrices(value)
         else
             value = typecast(binary, dtype);
         end
-        value = reshape(value, shape);
+        % convert row-major (C, Python) to column-major (FORTRAN, Matlab)
+        value = reshape(value, fliplr(shape));
+        value = permute(value, length(shape):-1:1);
     elseif iscell(value)
         for idx=1:numel(value)
             value{idx} = decode_matrices(value{idx});

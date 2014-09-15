@@ -54,6 +54,8 @@ In Matlab, some functions behave differently depending on the number of output a
 
 In some cases, `nargout` will report a wrong number of output arguments. For example `nargout profile` will say `1`, but `x = profile('on')` will raise an error that too few output arguments were used. To fix this, every function has a keyword argument `nargout`, which can be used in these cases: `matlab.profile('on', nargout=0)` calls `profile on` with no output arguments. `s, f, t, p = matlab.spectrogram(numpy.random.randn(1000), nargout=4)` returns all four output arguments of `spectrogram`.
 
+Note that functions are not called in the base workspace. Functions that access the current non-lexical workspace will therefore not work as expected. For example, `matlab.truth = 42', `matlab.exist('truth')` will not find the `truth` variable. Use `matlab.eval('exist truth')` instead in this case.
+
 OTHER FUNCTIONS
 ---------------
 
