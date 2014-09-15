@@ -36,9 +36,6 @@
 #include "mex.h"
 #include "zmq.h"
 
-/* Set a 200MB receiver buffer size */
-#define BUFLEN 200000000
-
 void *ctx = NULL;
 void *socket = NULL;
 
@@ -113,17 +110,14 @@ void open(int nlhs, mxArray *plhs[],
 void receive(int nlhs, mxArray *plhs[],
              int nrhs, const mxArray *prhs[]) {
 
-    char *recv_buffer = mxCalloc(BUFLEN, sizeof(char));
-
-    int msglen = zmq_recv(socket, recv_buffer, BUFLEN, 0);
-
-    if (msglen >= 0) {
-        plhs[0] = mxCreateString(recv_buffer);
+    zmq_msg_t msg;
+    int err = zmq_msg_init(&msg);
+    if (err) {
+        mexErrMsgTxt("Unknown ZMQ error");
     }
-    if (msglen > BUFLEN){
-        mexWarnMsgTxt("Receiver buffer overflow. Message truncated");
-    }
-    if (msglen < 0) {
+
+    int msglen = zmq_msg_recv(&msg, socket, 0);
+    if (msglen == -1) {
         switch (errno) {
         case EAGAIN:
             mexErrMsgTxt("Non-blocking mode was requested and no "
@@ -154,6 +148,21 @@ void receive(int nlhs, mxArray *plhs[],
             mexErrMsgTxt("The operation was interrupted by "
                          "delivery of a signal before a message "
                          "was available");
+            break;
+        case EFAULT:
+            mexErrMsgTxt("The message passed to the function was invalid");
+            break;
+        }
+    }
+
+    const char *data = mxCalloc(msglen, 1);
+    memcpy((void*)data, zmq_msg_data(&msg), msglen);
+    plhs[0] = mxCreateString(data);
+    err = zmq_msg_close(&msg);
+    if (err) {
+        switch (errno) {
+        case EFAULT:
+            mexErrMsgTxt("Invalid message");
             break;
         }
     }
