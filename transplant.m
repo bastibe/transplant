@@ -64,8 +64,8 @@ function transplant(url)
                     send_ack();
                 case 'get'
                     if isempty(evalin('base', ['who(''' msg.name ''')']))
-                       error('TRANSPLANT:novariable' , ...
-                             ['Undefined variable ''' msg.name '''.']);
+                        error('TRANSPLANT:novariable' , ...
+                            ['Undefined variable ''' msg.name '''.']);
                     end
                     value = evalin('base', msg.name);
                     send_value(value);
@@ -100,7 +100,7 @@ function transplant(url)
                             send_ack();
                         end
                     end
-                end
+            end
         catch err
             send_error(err)
         end
@@ -173,6 +173,10 @@ function [value] = encode_matrices(value)
             tmp(2:2:end) = imag(value(:));
             binary = typecast(tmp, 'uint8');
         end
+        if islogical(value)
+            % convert logicals (bool) into one-byte-per-bit
+            binary = cast(value,'uint8');
+        end
         base64 = base64encode(binary);
         % translate Matlab class names into numpy dtypes
         if isa(value, 'double') && isreal(value)
@@ -183,6 +187,8 @@ function [value] = encode_matrices(value)
             dtype = 'float32';
         elseif isa(value, 'single')
             dtype = 'complex64';
+        elseif isa(value, 'logical')
+            dtype = 'bool';
         elseif isinteger(value)
             dtype = class(value);
         else
@@ -224,14 +230,16 @@ function [value] = decode_matrices(value)
         % translate numpy dtypes into Matlab class names
         if strcmp(dtype, 'complex128')
             value = typecast(binary, 'double')';
-            value = value(1:2:end) + j*value(2:2:end);
+            value = value(1:2:end) + 1i*value(2:2:end);
         elseif strcmp(dtype, 'float64')
             value = typecast(binary, 'double')';
         elseif strcmp(dtype, 'complex64')
             value = typecast(binary, 'single')';
-            value = value(1:2:end) + j*value(2:2:end);
+            value = value(1:2:end) + 1i*value(2:2:end);
         elseif strcmp(dtype, 'float32')
             value = typecast(binary, 'single')';
+        elseif strcmp(dtype, 'bool')
+            value = logical(binary);
         else
             value = typecast(binary, dtype);
         end
