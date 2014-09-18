@@ -60,6 +60,8 @@ class Matlab:
     def eval(self, string, nargout=-1):
         """Send some code to Matlab to execute."""
         response = self.send_message('eval', string=string, nargout=nargout)
+        if 'conout' in response:
+            print(response['conout'])
         if response['type'] == 'value':
             return response['value']
 
@@ -98,6 +100,8 @@ class Matlab:
         args = list(args)
         response = self.send_message('call', name=name, args=args,
                                      nargout=nargout)
+        if 'conout' in response:
+            print(response['conout'])
         if response['type'] == 'value':
             return response['value']
 

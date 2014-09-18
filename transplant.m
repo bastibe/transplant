@@ -51,12 +51,13 @@ function transplant(url)
                     else
                         % try to get output from ans:
                         evalin('base', 'clear ans');
-                        evalin('base', msg.string);
+                        estr = 'evalin(''base'', msg.string)';
+                        T = evalc(estr);
                         try
-                            ans = evalin('base', 'ans');
-                            send_value(ans);
-                        catch err
-                            send_ack();
+                            evalans = evalin('base', 'ans');
+                            send_value(evalans,T);
+                        catch
+                            send_ack(T);
                         end
                     end
                 case 'put'
@@ -71,7 +72,7 @@ function transplant(url)
                     send_value(value);
                 case 'call'
                     fun = evalin('base', ['@' msg.name]);
-                    args = decode_matrices(msg.args);
+                    args = decode_matrices(msg.args); %#ok<NASGU>
 
                     % get the number of output arguments
                     if isfield(msg, 'nargout') && msg.nargout >= 0
@@ -84,20 +85,20 @@ function transplant(url)
                         % call the function with the given number of
                         % output arguments:
                         results = cell(resultsize, 1);
-                        [results{:}] = fun(args{:});
+                        T = evalc('[results{:}] = fun(args{:})');
                         if length(results) == 1
-                            send_value(results{1});
+                            send_value(results{1},T);
                         else
-                            send_value(results);
+                            send_value(results,T);
                         end
                     else
                         % try to get output from ans:
                         clear('ans');
-                        fun(args{:});
+                        T = evalc('fun(args{:})');
                         try
-                            send_value(ans);
-                        catch err
-                            send_ack();
+                            send_value(ans,T);
+                        catch
+                            send_ack(T);
                         end
                     end
             end
@@ -117,14 +118,21 @@ end
 % Send a message
 %
 % This is the base function for the specialized senders below
-function send_msg(msg_type, msg)
+function send_msg(msg_type, msg, conout)
+    if nargin>2 && ~isempty(conout)
+        msg.conout = conout;
+    end
     msg.type = msg_type;
     messenger('send', dumpjson(msg));
 end
 
 % Send an acknowledgement message
-function send_ack()
-    send_msg('ack', struct());
+function send_ack(conout)
+    if nargin==1
+        send_msg('ack', struct(), conout);
+    else
+        send_msg('ack', struct());
+    end
 end
 
 % Send an error message
@@ -136,9 +144,13 @@ function send_error(err)
 end
 
 % Send a message that contains a value
-function send_value(value)
+function send_value(value, conout)
     msg.value = encode_matrices(value);
-    send_msg('value', msg);
+    if nargin>2
+        send_msg('value', msg, conout);
+    else
+        send_msg('value', msg);
+    end
 end
 
 % recursively walk through value and encode all matrices
