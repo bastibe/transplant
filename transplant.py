@@ -3,7 +3,6 @@ import tempfile
 import zmq
 import numpy as np
 import base64
-import atexit
 from os.path import dirname
 from threading import Thread
 
@@ -53,9 +52,6 @@ class Matlab:
                              stdin=DEVNULL, stdout=PIPE, start_new_session=True)
         self._start_reader()
         self.eval('close') # no-op. Wait for Matlab startup to complete.
-        # in some cases, the destructor does not work for some reason.
-        # Make sure to definitely kill Matlab at shutdown, at least.
-        atexit.register(self.process.terminate)
 
     def put(self, name, value):
         """Save a named variable."""
@@ -97,18 +93,17 @@ class Matlab:
 
     def _start_reader(self):
         """Starts an asynchronous reader that echos everything Matlab says"""
+        stdout = self.process.stdout
         def reader():
             """Echo what Matlab says using print"""
-            for line in iter(self.process.stdout.readline, bytes()):
+            for line in iter(stdout.readline, bytes()):
                 print(line.decode(), end='')
         Thread(target=reader, daemon=True).start()
 
     def __del__(self):
         """Close the connection, and kill the process."""
-        print('Telling Matlab to die')
         self.send_message('die')
         self.process.terminate()
-        print('Matlab died')
 
     def send_message(self, msg_type, **kwargs):
         """Send a message and return the response"""

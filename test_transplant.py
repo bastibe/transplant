@@ -41,7 +41,7 @@ def test_nargout_two(matlab):
     assert np.all(idx-1 == np.argmax(test_data, axis=0))
 
 def test_data_type(matlab):
-    matlab.eval('test = uint8([1 2 3; 4 5 6]);')
+    matlab.evalin('base', 'test = uint8([1 2 3; 4 5 6]);', nargout=0)
     assert matlab.get('test').dtype == 'uint8'
     matlab.test = np.array(test_data, dtype='int16')
-    assert matlab.eval('class(test)') == 'int16'
+    assert matlab.evalin('base', 'class(test)', nargout=1) == 'int16'
