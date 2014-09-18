@@ -52,16 +52,10 @@ class Matlab:
                                       'ipc://' + self.ipcfile.name)],
                              stdin=DEVNULL, stdout=PIPE, start_new_session=True)
         self._start_reader()
-        self.eval('') # wait for Matlab startup to complete
+        self.eval('close') # no-op. Wait for Matlab startup to complete.
         # in some cases, the destructor does not work for some reason.
         # Make sure to definitely kill Matlab at shutdown, at least.
         atexit.register(self.process.terminate)
-
-    def eval(self, string, nargout=-1):
-        """Send some code to Matlab to execute."""
-        response = self.send_message('eval', string=string, nargout=nargout)
-        if response['type'] == 'value':
-            return response['value']
 
     def put(self, name, value):
         """Save a named variable."""
@@ -111,8 +105,10 @@ class Matlab:
 
     def __del__(self):
         """Close the connection, and kill the process."""
+        print('Telling Matlab to die')
         self.send_message('die')
         self.process.terminate()
+        print('Matlab died')
 
     def send_message(self, msg_type, **kwargs):
         """Send a message and return the response"""
