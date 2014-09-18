@@ -1,10 +1,11 @@
-from subprocess import Popen, DEVNULL
+from subprocess import Popen, DEVNULL, PIPE
 import tempfile
 import zmq
 import numpy as np
 import base64
 import atexit
 from os.path import dirname
+from threading import Thread
 
 
 """Transplant is a Python client for remote code execution
@@ -49,7 +50,8 @@ class Matlab:
                              ['-r', "addpath('{}'); transplant {}"
                               .format(dirname(__file__),
                                       'ipc://' + self.ipcfile.name)],
-                             stdin=DEVNULL, start_new_session=True)
+                             stdin=DEVNULL, stdout=PIPE, start_new_session=True)
+        self._start_reader()
         self.eval('') # wait for Matlab startup to complete
         # in some cases, the destructor does not work for some reason.
         # Make sure to definitely kill Matlab at shutdown, at least.
@@ -98,6 +100,14 @@ class Matlab:
                                      nargout=nargout)
         if response['type'] == 'value':
             return response['value']
+
+    def _start_reader(self):
+        """Starts an asynchronous reader that echos everything Matlab says"""
+        def reader():
+            """Echo what Matlab says using print"""
+            for line in iter(self.process.stdout.readline, bytes()):
+                print(line.decode(), end='')
+        Thread(target=reader, daemon=True).start()
 
     def __del__(self):
         """Close the connection, and kill the process."""
