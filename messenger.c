@@ -128,7 +128,7 @@ void receive(int nlhs, mxArray *plhs[],
         }
     }
 
-    const char *data = mxCalloc(msglen, 1);
+    char *data = mxCalloc(msglen+1, 1); /* one more NUL as terminator */
     memcpy((void*)data, zmq_msg_data(&msg), msglen);
     plhs[0] = mxCreateString(data);
     err = zmq_msg_close(&msg);
