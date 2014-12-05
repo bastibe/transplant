@@ -21,8 +21,9 @@
 function [obj] = parsejson(json)
     json = unescape_strings(json);
     str_tokens = tokenize_strings(json);
+    num_tokens = tokenize_numbers(json);
     idx = next(json, 1);
-    [obj, idx] = value(json, idx, str_tokens);
+    [obj, idx] = value(json, idx, str_tokens, num_tokens);
     idx = next(json, idx);
     if idx ~= length(json)+1
         error('JSON:parse:multipletoplevel', ...
@@ -38,16 +39,16 @@ function [idx] = next(json, idx)
 end
 
 % dispatches based on JSON type
-function [obj, idx] = value(json, idx, str_tokens)
+function [obj, idx] = value(json, idx, str_tokens, num_tokens)
     char = json(idx);
     if char == '"'
         [obj, idx] = string(json, idx, str_tokens);
     elseif any(char == '0123456789-')
-        [obj, idx] = number(json, idx);
+        [obj, idx] = number(json, idx, num_tokens);
     elseif char == '{'
-        [obj, idx] = object(json, idx, str_tokens);
+        [obj, idx] = object(json, idx, str_tokens, num_tokens);
     elseif char == '['
-        [obj, idx] = array(json, idx, str_tokens);
+        [obj, idx] = array(json, idx, str_tokens, num_tokens);
     elseif char == 't'
         [obj, idx] = true(json, idx);
     elseif char == 'f'
@@ -63,14 +64,8 @@ end
 
 % parses a string and advances idx
 function [obj, idx] = string(json, idx, str_tokens)
-    obj = '';
-    if json(idx) ~= '"'
-        error('JSON:parse:string:noquote', ...
-              ['string must start with " (char ' num2str(idx) ')']);
-    end
-    start = idx;
     stop = str_tokens(idx);
-    obj = json(start+1:stop-1);
+    obj = json(idx+1:stop-1);
     obj = strrep(obj, '\"', '"');
     obj = strrep(obj, '\\', '\');
     idx = stop+1;
@@ -87,66 +82,20 @@ function s = unescape_strings(s)
     s = regexprep(s, '\\u([0-9a-f]{4})', '${char(hex2dec($1))}');
 end
 
+function tokens = tokenize_numbers(s)
+    [string_start string_end] = regexp(s, '-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?');
+    tokens = sparse(string_start, ones(1, length(string_start)), string_end);
+end
+
 % parses a number and advances idx
-function [obj, idx] = number(json, idx)
-    start = idx;
-    if getchar() == '-'
-        idx = idx+1;
-    end
-    if getchar == '0'
-        idx = idx+1;
-    elseif any(getchar() == '123456789')
-        idx = idx+1;
-        digits();
-    else
-        error('JSON:parse:number:nodigit', ...
-              ['number ' json(start:idx-1) ' must start with digit' ...
-               '(char ' num2str(start) ')']);
-    end
-    if getchar() == '.'
-        idx = idx+1;
-        if any(getchar() == '0123456789')
-            idx = idx+1;
-        else
-            error('JSON:parse:number:nodecimal', ...
-                  ['no digit after decimal point in ' ...
-                    json(start:idx-1) ' (char ' num2str(start) ')']);
-        end
-        digits();
-    end
-    if getchar() == 'e' || getchar() == 'E'
-        idx = idx+1;
-        if getchar() == '+' || getchar() == '-'
-            idx = idx+1;
-        end
-        if any(getchar() == '0123456789')
-            idx = idx+1;
-            digits();
-        else
-            error('JSON:parse:number:noexponent', ...
-                  ['no digit in exponent of ' json(start:idx-1) ...
-                   ' (char ' num2str(start) ')']);
-        end
-    end
-    obj = str2num(json(start:idx-1));
-
-    function digits()
-        while any(getchar() == '1234567890')
-            idx = idx+1;
-        end
-    end
-
-    function c = getchar()
-        if idx > length(json)
-            c = ' ';
-        else
-            c = json(idx);
-        end
-    end
+function [obj, idx] = number(json, idx, num_tokens)
+    stop = num_tokens(idx);
+    obj = str2num(json(idx:stop));
+    idx = stop+1;
 end
 
 % parses an object and advances idx
-function [obj, idx] = object(json, idx, str_tokens)
+function [obj, idx] = object(json, idx, str_tokens, num_tokens)
     start = idx;
     obj = struct();
     if json(idx) ~= '{'
@@ -157,6 +106,10 @@ function [obj, idx] = object(json, idx, str_tokens)
     idx = next(json, idx);
     if json(idx) ~= '}'
         while 1
+            if json(idx) ~= '"'
+                error('JSON:parse:string:noquote', ...
+                      ['string must start with " (char ' num2str(idx) ')']);
+            end
             [k, idx] = string(json, idx, str_tokens);
             idx = next(json, idx);
             if json(idx) == ':'
@@ -167,7 +120,7 @@ function [obj, idx] = object(json, idx, str_tokens)
                        '" (char ' num2str(idx) ')']);
             end
             idx = next(json, idx);
-            [v, idx] = value(json, idx, str_tokens);
+            [v, idx] = value(json, idx, str_tokens, num_tokens);
             obj.(k) = v;
             idx = next(json, idx);
             if json(idx) == ','
@@ -187,7 +140,7 @@ function [obj, idx] = object(json, idx, str_tokens)
 end
 
 % parses an array and advances idx
-function [obj, idx] = array(json, idx, str_tokens)
+function [obj, idx] = array(json, idx, str_tokens, num_tokens)
     start = idx;
     obj = {};
     if json(idx) ~= '['
@@ -198,7 +151,7 @@ function [obj, idx] = array(json, idx, str_tokens)
     idx = next(json, idx);
     if json(idx) ~= ']'
         while 1
-            [v, idx] = value(json, idx, str_tokens);
+            [v, idx] = value(json, idx, str_tokens, num_tokens);
             obj = [obj, {v}];
             idx = next(json, idx);
             if json(idx) == ','
