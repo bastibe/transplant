@@ -19,8 +19,10 @@
 % (c) 2014 Bastian Bechtold
 
 function [obj] = parsejson(json)
+    json = unescape_strings(json);
+    str_tokens = tokenize_strings(json);
     idx = next(json, 1);
-    [obj, idx] = value(json, idx);
+    [obj, idx] = value(json, idx, str_tokens);
     idx = next(json, idx);
     if idx ~= length(json)+1
         error('JSON:parse:multipletoplevel', ...
@@ -36,16 +38,16 @@ function [idx] = next(json, idx)
 end
 
 % dispatches based on JSON type
-function [obj, idx] = value(json, idx)
+function [obj, idx] = value(json, idx, str_tokens)
     char = json(idx);
     if char == '"'
-        [obj, idx] = string(json, idx);
+        [obj, idx] = string(json, idx, str_tokens);
     elseif any(char == '0123456789-')
         [obj, idx] = number(json, idx);
     elseif char == '{'
-        [obj, idx] = object(json, idx);
+        [obj, idx] = object(json, idx, str_tokens);
     elseif char == '['
-        [obj, idx] = array(json, idx);
+        [obj, idx] = array(json, idx, str_tokens);
     elseif char == 't'
         [obj, idx] = true(json, idx);
     elseif char == 'f'
@@ -60,48 +62,29 @@ function [obj, idx] = value(json, idx)
 end
 
 % parses a string and advances idx
-function [obj, idx] = string(json, idx)
+function [obj, idx] = string(json, idx, str_tokens)
     obj = '';
     if json(idx) ~= '"'
         error('JSON:parse:string:noquote', ...
               ['string must start with " (char ' num2str(idx) ')']);
     end
-    idx = idx+1;
     start = idx;
-    stop = regexp(json(start:end), '(?<!\\)"', 'once');
-    idx = start+stop;
-    obj = json(start:start+stop-2);
-    % check for errors
-    match = regexp(obj, '\\[^trnfbu\\/"]', 'match', 'once');
-    if length(match) > 0
-        error('JSON:parse:string:unknownescape', ...
-              ['string "' obj '" contains illegal escape sequence "' match '")']);
-    end
-    obj = strrep(obj, '\t', sprintf('\t'));
-    obj = strrep(obj, '\r', sprintf('\r'));
-    obj = strrep(obj, '\n', sprintf('\n'));
-    obj = strrep(obj, '\f', sprintf('\f'));
-    obj = strrep(obj, '\b', sprintf('\b'));
-    obj = strrep(obj, '\/', '/');
+    stop = str_tokens(idx);
+    obj = json(start+1:stop-1);
     obj = strrep(obj, '\"', '"');
-    % replace \u09af with char(hex2dec('09af'))
-    matches = regexp(obj, '\\u[0-9a-f]{4}');
-    for uidx=1:length(matches)
-        match_idx = matches(uidx)-5*(uidx-1);
-        match = char(hex2dec(obj(match_idx+2:match_idx+5)));
-        if match_idx == 1
-            before = '';
-        else
-            before = obj(1:match_idx-1);
-        end
-        if match_idx+5 == length(obj)
-            after = '';
-        else
-            after = obj(match_idx+6:end);
-        end
-        obj = [before match after];
-    end
     obj = strrep(obj, '\\', '\');
+    idx = stop+1;
+end
+
+function tokens = tokenize_strings(s)
+    [string_start string_end] = regexp(s, '".*?(?<!\\)"');
+    tokens = sparse(string_start, ones(1, length(string_start)), string_end);
+end
+
+function s = unescape_strings(s)
+    s = regexprep(s, '\\[trnfb]', '${sprintf($0)}');
+    s = strrep(s, '\/', '/');
+    s = regexprep(s, '\\u([0-9a-f]{4})', '${char(hex2dec($1))}');
 end
 
 % parses a number and advances idx
@@ -163,7 +146,7 @@ function [obj, idx] = number(json, idx)
 end
 
 % parses an object and advances idx
-function [obj, idx] = object(json, idx)
+function [obj, idx] = object(json, idx, str_tokens)
     start = idx;
     obj = struct();
     if json(idx) ~= '{'
@@ -174,7 +157,7 @@ function [obj, idx] = object(json, idx)
     idx = next(json, idx);
     if json(idx) ~= '}'
         while 1
-            [k, idx] = string(json, idx);
+            [k, idx] = string(json, idx, str_tokens);
             idx = next(json, idx);
             if json(idx) == ':'
                 idx = idx+1;
@@ -184,7 +167,7 @@ function [obj, idx] = object(json, idx)
                        '" (char ' num2str(idx) ')']);
             end
             idx = next(json, idx);
-            [v, idx] = value(json, idx);
+            [v, idx] = value(json, idx, str_tokens);
             obj.(k) = v;
             idx = next(json, idx);
             if json(idx) == ','
@@ -204,7 +187,7 @@ function [obj, idx] = object(json, idx)
 end
 
 % parses an array and advances idx
-function [obj, idx] = array(json, idx)
+function [obj, idx] = array(json, idx, str_tokens)
     start = idx;
     obj = {};
     if json(idx) ~= '['
@@ -215,7 +198,7 @@ function [obj, idx] = array(json, idx)
     idx = next(json, idx);
     if json(idx) ~= ']'
         while 1
-            [v, idx] = value(json, idx);
+            [v, idx] = value(json, idx, str_tokens);
             obj = [obj, {v}];
             idx = next(json, idx);
             if json(idx) == ','
