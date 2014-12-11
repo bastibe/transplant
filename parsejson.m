@@ -121,7 +121,11 @@ function [obj, idx] = object(json, idx, str_tokens, num_tokens)
             end
             idx = next(json, idx);
             [v, idx] = value(json, idx, str_tokens, num_tokens);
-            obj.(k) = v;
+            if ~isletter(k(1))
+                obj.(['alpha__' k]) = v;
+            else
+                obj.(k) = v;
+            end
             idx = next(json, idx);
             if json(idx) == ','
                 idx = idx+1;
