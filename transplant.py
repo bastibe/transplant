@@ -73,7 +73,7 @@ class Matlab:
         else:
             try:
                 return self.get(name)
-            except Error:
+            except Exception:
                 raise NameError("Name '{}' is not defined in Matlab.".format(name))
 
     def __setattr__(self, name, value):
