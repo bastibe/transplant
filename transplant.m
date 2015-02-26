@@ -10,7 +10,7 @@
 %    TRANSPLANT implements the following message types:
 %    - 'eval': evaluates the 'string' of the message.
 %    - 'die': closes the 0MQ session and quits Matlab.
-%    - 'put': saves the 'value' as a global variable called 'name'.
+%    - 'set': saves the 'value' as a global variable called 'name'.
 %    - 'get': retrieve the global variable 'name'.
 %    - 'call': call function 'name' with 'args' and 'nargout'.
 %
@@ -19,7 +19,7 @@
 %    - 'error': there was an error while handling the message.
 %    - 'value': returns a value.
 %
-%    `put`, `get`, and `call` use a special encoding for matrices. See
+%    `set`, `get`, and `call` use a special encoding for matrices. See
 %    `encode_matrices` and `decode_matrices` for more detail.
 
 % (c) 2014 Bastian Bechtold
@@ -28,6 +28,8 @@ function transplant(url)
 
     % start 0MQ:
     messenger('open', url)
+
+    proxied_objects = {};
 
     while 1 % main messaging loop
 
@@ -59,8 +61,9 @@ function transplant(url)
                             send_ack();
                         end
                     end
-                case 'put'
-                    assignin('base', msg.name, decode_matrices(msg.value));
+                case 'set'
+                    value = decode_matrices(decode_proxies(msg.value));
+                    assignin('base', msg.name, value);
                     send_ack();
                 case 'get'
                     if isempty(evalin('base', ['who(''' msg.name ''')']))
@@ -69,9 +72,20 @@ function transplant(url)
                     end
                     value = evalin('base', msg.name);
                     send_value(value);
+                case 'set_proxy'
+                    obj = proxied_objects{msg.handle};
+                    value = decode_matrices(decode_proxies(msg.value));
+                    set(obj, msg.name, value);
+                    send_ack();
+                case 'get_proxy'
+                    obj = proxied_objects{msg.handle};
+                    value = get(obj, msg.name);
+                    send_value(value);
+                case 'del_proxy'
+                    proxied_objects{msg.handle} = [];
                 case 'call'
                     fun = evalin('base', ['@' msg.name]);
-                    args = decode_matrices(msg.args);
+                    args = decode_proxies(decode_matrices(msg.args));
 
                     % get the number of output arguments
                     if isfield(msg, 'nargout') && msg.nargout >= 0
@@ -105,6 +119,58 @@ function transplant(url)
             send_error(err)
         end
     end
+
+    function [value] = encode_proxies(value)
+        if isobject(value)
+            if length(value) > 1
+                out = {};
+                for n=1:length(value)
+                    out{n} = encode_proxies(value(n));
+                end
+                value = out;
+            else
+                proxied_objects{length(proxied_objects)+1} = value;
+                value = {'__proxy__', length(proxied_objects)};
+            end
+        elseif iscell(value)
+            for idx=1:numel(value)
+                value{idx} = encode_proxies(value{idx});
+            end
+        elseif isstruct(value)
+            keys = fieldnames(value);
+            for idx=1:numel(value)
+                for n=1:length(keys)
+                    key = keys{n};
+                    value(idx).(key) = encode_proxies(value(idx).(key));
+                end
+            end
+        end
+    end
+
+    function [value] = decode_proxies(value)
+        if iscell(value) && numel(value) == 2 && strcmp(value{1}, '__proxy__')
+            value = proxied_objects{value{2}};
+        elseif iscell(value)
+            for idx=1:numel(value)
+                value{idx} = decode_proxies(value{idx});
+            end
+        elseif isstruct(value)
+            keys = fieldnames(value);
+            for idx=1:numel(value)
+                for n=1:length(keys)
+                    key = keys{n};
+                    value(idx).(key) = decode_proxies(value(idx).(key));
+                end
+            end
+        end
+    end
+
+    % Send a message that contains a value
+    function send_value(value)
+        msg.value = encode_proxies(encode_matrices(value));
+        send_msg('value', msg);
+    end
+
 end
 
 
@@ -133,12 +199,6 @@ function send_error(err)
     msg.message = err.message;
     msg.stack = err.stack;
     send_msg('error', msg);
-end
-
-% Send a message that contains a value
-function send_value(value)
-    msg.value = encode_matrices(value);
-    send_msg('value', msg);
 end
 
 % recursively walk through value and encode all matrices
