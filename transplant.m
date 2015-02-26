@@ -33,7 +33,7 @@ function transplant(url)
 
     while 1 % main messaging loop
 
-        msg = receive_msg();
+        msg = decode_values(receive_msg());
 
         try
             switch msg.type
@@ -62,8 +62,7 @@ function transplant(url)
                         end
                     end
                 case 'set'
-                    value = decode_matrices(decode_proxies(msg.value));
-                    assignin('base', msg.name, value);
+                    assignin('base', msg.name, msg.value);
                     send_ack();
                 case 'get'
                     if isempty(evalin('base', ['who(''' msg.name ''')']))
@@ -74,8 +73,7 @@ function transplant(url)
                     send_value(value);
                 case 'set_proxy'
                     obj = proxied_objects{msg.handle};
-                    value = decode_matrices(decode_proxies(msg.value));
-                    set(obj, msg.name, value);
+                    set(obj, msg.name, msg.value);
                     send_ack();
                 case 'get_proxy'
                     obj = proxied_objects{msg.handle};
@@ -85,7 +83,6 @@ function transplant(url)
                     proxied_objects{msg.handle} = [];
                 case 'call'
                     fun = evalin('base', ['@' msg.name]);
-                    args = decode_proxies(decode_matrices(msg.args));
 
                     % get the number of output arguments
                     if isfield(msg, 'nargout') && msg.nargout >= 0
@@ -98,7 +95,7 @@ function transplant(url)
                         % call the function with the given number of
                         % output arguments:
                         results = cell(resultsize, 1);
-                        [results{:}] = fun(args{:});
+                        [results{:}] = fun(msg.args{:});
                         if length(results) == 1
                             send_value(results{1});
                         else
@@ -107,7 +104,7 @@ function transplant(url)
                     else
                         % try to get output from ans:
                         clear('ans');
-                        fun(args{:});
+                        fun(msg.args{:});
                         try
                             send_value(ans);
                         catch err
@@ -120,46 +117,53 @@ function transplant(url)
         end
     end
 
-    function [value] = encode_proxies(value)
-        if isobject(value)
-            if length(value) > 1
-                out = {};
-                for n=1:length(value)
-                    out{n} = encode_proxies(value(n));
-                end
-                value = out;
-            else
-                proxied_objects{length(proxied_objects)+1} = value;
-                value = {'__proxy__', length(proxied_objects)};
+    function [out] = encode_object(object)
+        if length(object) > 1
+            out = {};
+            for n=1:length(object)
+                out{n} = encode_object(object(n));
             end
+        else
+            proxied_objects{length(proxied_objects)+1} = object;
+            out = {'__proxy__', length(proxied_objects)};
+        end
+    end
+
+    function [value] = encode_values(value)
+        if isnumeric(value) && (any(size(value) > 1) || ~isreal(value))
+            value = encode_matrix(value);
+        elseif isobject(value)
+            value = encode_object(value);
         elseif iscell(value)
             for idx=1:numel(value)
-                value{idx} = encode_proxies(value{idx});
+                value{idx} = encode_values(value{idx});
             end
         elseif isstruct(value)
             keys = fieldnames(value);
             for idx=1:numel(value)
                 for n=1:length(keys)
                     key = keys{n};
-                    value(idx).(key) = encode_proxies(value(idx).(key));
+                    value(idx).(key) = encode_values(value(idx).(key));
                 end
             end
         end
     end
 
-    function [value] = decode_proxies(value)
-        if iscell(value) && numel(value) == 2 && strcmp(value{1}, '__proxy__')
+    function [value] = decode_values(value)
+        if iscell(value) && numel(value) == 4 && strcmp(value{1}, '__matrix__')
+            value = decode_matrix(value);
+        elseif iscell(value) && numel(value) == 2 && strcmp(value{1}, '__proxy__')
             value = proxied_objects{value{2}};
         elseif iscell(value)
             for idx=1:numel(value)
-                value{idx} = decode_proxies(value{idx});
+                value{idx} = decode_values(value{idx});
             end
         elseif isstruct(value)
             keys = fieldnames(value);
             for idx=1:numel(value)
                 for n=1:length(keys)
                     key = keys{n};
-                    value(idx).(key) = decode_proxies(value(idx).(key));
+                    value(idx).(key) = decode_values(value(idx).(key));
                 end
             end
         end
@@ -167,17 +171,16 @@ function transplant(url)
 
     % Send a message that contains a value
     function send_value(value)
-        msg.value = encode_proxies(encode_matrices(value));
+        msg.value = encode_values(value);
         send_msg('value', msg);
     end
 
-end
+    % Wait for and receive a message
+    function msg = receive_msg()
+        blob = messenger('receive');
+        msg = decode_values(parsejson(blob));
+    end
 
-
-% Wait for and receive a message
-function msg = receive_msg()
-    blob = messenger('receive');
-    msg = parsejson(blob);
 end
 
 % Send a message
@@ -201,122 +204,89 @@ function send_error(err)
     send_msg('error', msg);
 end
 
-% recursively walk through value and encode all matrices
-%
 % The matrix `np.array([[1, 2], [3, 4]], dtype='int32')` would be
 % encoded as
 % `["__matrix__", "int32", [2, 2], "AQAAAAIAAAADAAAABAAAA==\n"]`
 %
 % where `"int32"` is the data type, `[2, 2]` is the matrix shape and
 % `"AQAAAAIAAAADAAAABAAAA==\n"` is the base64-encoded matrix content.
-function [value] = encode_matrices(value)
-    if isnumeric(value) && (any(size(value) > 1) || ~isreal(value))
-        if ~isreal(value) && isinteger(value)
-            value = double(value); % Numpy does not know complex
-        % integers
-        end
-        if isreal(value)
-            % convert column-major (FORTRAN, Matlab) to
-            % row-major (C, Python)
-            value = permute(value, length(size(value)):-1:1);
-            binary = typecast(value(:), 'uint8');
-        else
-            % convert [complex, complex] into [real, imag, real, imag]
-            % since encodeBase64Chunked can only deal with real 1-D
-            % arrays.
-            tmp = zeros(numel(value)*2, 1);
-            if isa(value, 'single')
-                tmp = single(tmp);
-            end
-            value = permute(value, length(size(value)):-1:1);
-            tmp(1:2:end) = real(value(:));
-            tmp(2:2:end) = imag(value(:));
-            binary = typecast(tmp, 'uint8');
-        end
-        if islogical(value)
-            % convert logicals (bool) into one-byte-per-bit
-            binary = cast(value,'uint8');
-        end
-        base64 = base64encode(binary);
-        % translate Matlab class names into numpy dtypes
-        if isa(value, 'double') && isreal(value)
-            dtype = 'float64';
-        elseif isa(value, 'double')
-            dtype = 'complex128';
-        elseif isa(value, 'single') && isreal(value)
-            dtype = 'float32';
-        elseif isa(value, 'single')
-            dtype = 'complex64';
-        elseif isa(value, 'logical')
-            dtype = 'bool';
-        elseif isinteger(value)
-            dtype = class(value);
-        else
-            return % don't encode
-        end
-        % save as row-major (C, Python)
-        value = {'__matrix__', dtype, fliplr(size(value)), base64};
-    elseif iscell(value)
-        for idx=1:numel(value)
-            value{idx} = encode_matrices(value{idx});
-        end
-    elseif isstruct(value)
-        keys = fieldnames(value);
-        for idx=1:numel(value)
-            for n=1:length(keys)
-                key = keys{n};
-                value(idx).(key) = encode_matrices(value(idx).(key));
-            end
-        end
+function [value] = encode_matrix(value)
+    if ~isreal(value) && isinteger(value)
+        value = double(value); % Numpy does not know complex
     end
+    if isreal(value)
+        % convert column-major (FORTRAN, Matlab) to
+        % row-major (C, Python)
+        value = permute(value, length(size(value)):-1:1);
+        binary = typecast(value(:), 'uint8');
+    else
+        % convert [complex, complex] into [real, imag, real, imag]
+        % since encodeBase64Chunked can only deal with real 1-D
+        % arrays.
+        tmp = zeros(numel(value)*2, 1);
+        if isa(value, 'single')
+            tmp = single(tmp);
+        end
+        value = permute(value, length(size(value)):-1:1);
+        tmp(1:2:end) = real(value(:));
+        tmp(2:2:end) = imag(value(:));
+        binary = typecast(tmp, 'uint8');
+    end
+    if islogical(value)
+        % convert logicals (bool) into one-byte-per-bit
+        binary = cast(value,'uint8');
+    end
+    base64 = base64encode(binary);
+    % translate Matlab class names into numpy dtypes
+    if isa(value, 'double') && isreal(value)
+        dtype = 'float64';
+    elseif isa(value, 'double')
+        dtype = 'complex128';
+    elseif isa(value, 'single') && isreal(value)
+        dtype = 'float32';
+    elseif isa(value, 'single')
+        dtype = 'complex64';
+    elseif isa(value, 'logical')
+        dtype = 'bool';
+    elseif isinteger(value)
+        dtype = class(value);
+    else
+        return % don't encode
+    end
+    % save as row-major (C, Python)
+    value = {'__matrix__', dtype, fliplr(size(value)), base64};
 end
 
-% recursively walk through value and decode all matrices
-%
 % The matrix `np.array([[1, 2], [3, 4]], dtype='int32')` would be
 % encoded as
 % `["__matrix__", "int32", [2, 2], "AQAAAAIAAAADAAAABAAAA==\n"]`
 %
 % where `"int32"` is the data type, `[2, 2]` is the matrix shape and
 % `"AQAAAAIAAAADAAAABAAAA==\n"` is the base64-encoded matrix content.
-function [value] = decode_matrices(value)
-    if iscell(value) && numel(value) == 4 && strcmp(value{1}, '__matrix__')
-        dtype = value{2};
-        shape = cell2mat(value{3});
-        if length(shape) == 1
-           shape = [1 shape];
-        end
-        binary = base64decode(value{4});
-        % translate numpy dtypes into Matlab class names
-        if strcmp(dtype, 'complex128')
-            value = typecast(binary, 'double')';
-            value = value(1:2:end) + 1i*value(2:2:end);
-        elseif strcmp(dtype, 'float64')
-            value = typecast(binary, 'double')';
-        elseif strcmp(dtype, 'complex64')
-            value = typecast(binary, 'single')';
-            value = value(1:2:end) + 1i*value(2:2:end);
-        elseif strcmp(dtype, 'float32')
-            value = typecast(binary, 'single')';
-        elseif strcmp(dtype, 'bool')
-            value = logical(binary);
-        else
-            value = typecast(binary, dtype);
-        end
-        % convert row-major (C, Python) to column-major (FORTRAN, Matlab)
-        value = reshape(value, fliplr(shape));
-        value = permute(value, length(shape):-1:1);
-    elseif iscell(value)
-        for idx=1:numel(value)
-            value{idx} = decode_matrices(value{idx});
-        end
-    elseif isstruct(value)
-        keys = fieldnames(value);
-        for idx=1:numel(value)
-            for n=1:length(keys)
-                key = keys{n};
-                value(idx).(key) = decode_matrices(value(idx).(key));
-            end
-        end
+function [value] = decode_matrix(value)
+    dtype = value{2};
+    shape = cell2mat(value{3});
+    if length(shape) == 1
+        shape = [1 shape];
     end
+    binary = base64decode(value{4});
+    % translate numpy dtypes into Matlab class names
+    if strcmp(dtype, 'complex128')
+        value = typecast(binary, 'double')';
+        value = value(1:2:end) + 1i*value(2:2:end);
+    elseif strcmp(dtype, 'float64')
+        value = typecast(binary, 'double')';
+    elseif strcmp(dtype, 'complex64')
+        value = typecast(binary, 'single')';
+        value = value(1:2:end) + 1i*value(2:2:end);
+    elseif strcmp(dtype, 'float32')
+        value = typecast(binary, 'single')';
+    elseif strcmp(dtype, 'bool')
+        value = logical(binary);
+    else
+        value = typecast(binary, dtype);
+    end
+    % convert row-major (C, Python) to column-major (FORTRAN, Matlab)
+    value = reshape(value, fliplr(shape));
+    value = permute(value, length(shape):-1:1);
 end

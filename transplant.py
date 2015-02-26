@@ -145,12 +145,10 @@ class Matlab:
 
     def send_message(self, msg_type, **kwargs):
         """Send a message and return the response"""
-        kwargs = self.encode_matrices(kwargs)
-        kwargs = self.encode_proxies(kwargs)
+        kwargs = self.encode_values(kwargs)
         self.socket.send_json(dict(kwargs, type=msg_type))
         response = self.socket.recv_json()
-        response = self.decode_matrices(response)
-        response = self.decode_proxies(response)
+        response = self.decode_values(response)
         if response['type'] == 'error':
             # Create a pretty backtrace almost like Python's:
             trace = 'Traceback (most recent call last):\n'
@@ -164,7 +162,46 @@ class Matlab:
                               response['stack'], response['identifier'], response['message'])
         return response
 
-    def encode_matrices(self, data):
+    def encode_values(self, data):
+        if isinstance(data, np.ndarray):
+            return self.encode_matrix(data)
+        elif isinstance(data, ProxyObject):
+            return self.encode_proxy(data)
+        elif isinstance(data, dict):
+            out = {}
+            for key in data:
+                out[key] = self.encode_values(data[key])
+        elif isinstance(data, list) or isinstance(data, tuple):
+            out = list(data)
+            for idx in range(len(data)):
+                out[idx] = self.encode_values(data[idx])
+        else:
+            out = data
+        return out
+
+    def decode_values(self, data):
+        if (isinstance(data, list) and
+            len(data) == 4 and
+            data[0] == "__matrix__"):
+            return self.decode_matrix(data)
+        elif (isinstance(data, list) and
+            len(data) == 2 and
+            data[0] == "__proxy__"):
+            return self.decode_proxy(data)
+        elif isinstance(data, dict):
+            out = {}
+            for key in data:
+                out[key] = self.decode_values(data[key])
+        elif isinstance(data, list) or isinstance(data, tuple):
+            out = list(data)
+            for idx in range(len(data)):
+                out[idx] = self.decode_values(data[idx])
+        else:
+            out = data
+        return out
+
+
+    def encode_matrix(self, data):
         """Recursively walk through data and encode all matrices as JSON data.
 
         The matrix `np.array([[1, 2], [3, 4]], dtype='int32')` would
@@ -177,22 +214,10 @@ class Matlab:
 
         """
 
-        if isinstance(data, np.ndarray):
-            return ["__matrix__", data.dtype.name, data.shape,
-                    base64.encodebytes(data.tostring()).decode()]
-        elif isinstance(data, dict):
-            out = {}
-            for key in data:
-                out[key] = self.encode_matrices(data[key])
-        elif isinstance(data, list) or isinstance(data, tuple):
-            out = list(data)
-            for idx in range(len(data)):
-                out[idx] = self.encode_matrices(data[idx])
-        else:
-            out = data
-        return out
+        return ["__matrix__", data.dtype.name, data.shape,
+                base64.encodebytes(data.tostring()).decode()]
 
-    def decode_matrices(self, data):
+    def decode_matrix(self, data):
         """Recursively walk through data and decode all matrices to np.ndarray
 
         The matrix `np.array([[1, 2], [3, 4]], dtype='int32')` would
@@ -205,47 +230,17 @@ class Matlab:
 
         """
 
-        if (isinstance(data, list) and
-            len(data) == 4 and
-            data[0] == "__matrix__"):
-            dtype, shape, data = data[1:]
-            out = np.fromstring(base64.decodebytes(data.encode()), dtype)
-            return out.reshape(*shape)
-        elif isinstance(data, dict):
-            out = {}
-            for key in data:
-                out[key] = self.decode_matrices(data[key])
-        elif isinstance(data, list) or isinstance(data, tuple):
-            out = list(data)
-            for idx in range(len(data)):
-                out[idx] = self.decode_matrices(data[idx])
-        else:
-            out = data
-        return out
+        dtype, shape, data = data[1:]
+        out = np.fromstring(base64.decodebytes(data.encode()), dtype)
+        return out.reshape(*shape)
 
-    def encode_proxies(self, data):
-        """Recursively walk through data and encode all proxy objects.
-
-        A proxy with handle `42` would be be encoded as
-        `["__proxy__", 42]`
-
+    def encode_proxy(self, data):
+        """A proxy with handle `42` would be be encoded as `["__proxy__", 42]`
         """
 
-        if isinstance(data, ProxyObject):
-            return ["__proxy__", data.handle]
-        elif isinstance(data, dict):
-            out = {}
-            for key in data:
-                out[key] = self.encode_proxies(data[key])
-        elif isinstance(data, list) or isinstance(data, tuple):
-            out = list(data)
-            for idx in range(len(data)):
-                out[idx] = self.encode_proxies(data[idx])
-        else:
-            out = data
-        return out
+        return ["__proxy__", data.handle]
 
-    def decode_proxies(self, data):
+    def decode_proxy(self, data):
         """Recursively walk through data and decode all proxy objects.
 
         A proxy with handle `42` would be be encoded as
@@ -253,18 +248,4 @@ class Matlab:
 
         """
 
-        if (isinstance(data, list) and
-            len(data) == 2 and
-            data[0] == "__proxy__"):
-            return ProxyObject(self, data[1])
-        elif isinstance(data, dict):
-            out = {}
-            for key in data:
-                out[key] = self.decode_proxies(data[key])
-        elif isinstance(data, list) or isinstance(data, tuple):
-            out = list(data)
-            for idx in range(len(data)):
-                out[idx] = self.decode_proxies(data[idx])
-        else:
-            out = data
-        return out
+        return ProxyObject(self, data[1])
