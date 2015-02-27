@@ -1,4 +1,5 @@
 from subprocess import Popen, DEVNULL, PIPE
+import re
 import tempfile
 import zmq
 import numpy as np
@@ -9,33 +10,48 @@ from threading import Thread
 
 """Transplant is a Python client for remote code execution
 
+You can call Matlab functions and interact with Matlab objects. Matlab
+functions and objects are wrapped in proxy functions and objects in
+Python, which forward all interactions to Matlab, and get resolved to
+the original functions/objects when transferred back to Matlab.
+
+All basic data types are passed by value, and Matlab matrices are
+converted to Numpy arrays and vice versa.
+
 It can start and connect Matlab servers and send them messages. All
 messages are JSON-encoded strings. All messages are dictionaries with
 at least one key: 'type'.
 
 Depending on the message type, other keys may or may not be set.
 
-These message types are implemented:
-- 'eval': the server evaluates the content of the message.
+There are seven request types sent by Python:
 - 'die': the server closes its 0MQ session and quits.
 - 'set': saves the 'value' as a global variable called 'name'.
-- 'get': retrieves the global variable 'name'.
-- 'set_proxy': saves the 'value' as a field called 'name' on object 'handle'.
-- 'get_proxy': retrieves the field called 'name' on object 'handle'.
+- 'get': retrieves the value of a global variable 'name'.
+- 'set_proxy': saves the 'value' as a field called 'name' on cached
+               object 'handle'.
+- 'get_proxy': retrieves the field called 'name' on cached object
+               'handle'.
+- 'del_proxy': remove cached object 'handle'.
 - 'call': call function 'name' with 'args' and 'nargout'.
 
-These response types are implemented:
+There are three response types:
 - 'ack': the server received the message successfully.
 - 'error': there was an error while handling the message.
 - 'value': returns a value.
-- 'proxy': returns a handle to a server value.
 
-`set`, `get`, and `call` use a special encoding for matrices. See
-`Matlab.encode_matrices` and `Matlab.decode_matrices` for more detail.
+To enable cross-language functions, objects and matrices, these are
+encoded specially when transmitted between Python and Matlab:
+- Matrices are encoded as {"__matrix__", ... }
+- Functions are encoded as {"__function__", str2func(f) }
+- Objects are encoded as {"__object__", handle }
 
 """
 
+
 class MatlabError(RuntimeError):
+    """An exception that retains some Matlab-specific metadata."""
+
     def __init__(self, message, stack, identifier, original_message):
         super(MatlabError, self).__init__(message)
         self.stack = stack
@@ -43,7 +59,8 @@ class MatlabError(RuntimeError):
         self.original_message = original_message
 
 
-class ProxyObject:
+class MatlabProxyObject:
+    """Forwards all property access to an associated Matlab object."""
 
     def __init__(self, process, handle):
         self.__dict__['handle'] = handle
@@ -61,6 +78,15 @@ class ProxyObject:
     def __repr__(self):
         getclass = self.process.str2func('class')
         return "<proxy for Matlab {} object>".format(getclass(self))
+
+    def __str__(self):
+        # remove pseudo-html tags from Matlab output
+        html_str = self.process.eval("@(x) evalc('disp(x)')")(self)
+        return re.sub('</?a[^>]*>', '', html_str)
+
+    def __del__(self):
+        self.process._del_proxy(self.handle)
+
 
 class Matlab:
     """An instance of Matlab, running in its own process."""
@@ -100,19 +126,13 @@ class Matlab:
         response = self.send_message('get_proxy', handle=handle, name=name)
         return response['value']
 
+    def _del_proxy(self, handle):
+        """Tell Matlab to forget about this proxy object."""
+        self.send_message('del_proxy', handle=handle)
+
     def __getattr__(self, name):
         """Retrieve a value or function from Matlab."""
-        type = self._call('exist', [name], nargout=1)
-        if type in (2, 3, 5, 6):
-            def call_matlab(*args, nargout=-1):
-                return self._call(name, args, nargout=nargout)
-            call_matlab.__doc__, _ = self._call('help', [name])
-            return call_matlab
-        else:
-            try:
-                return self._get_value(name)
-            except Exception:
-                raise NameError("Name '{}' is not defined in Matlab.".format(name))
+        return self._get_value(name)
 
     def __setattr__(self, name, value):
         """Retrieve a value or function from Matlab."""
@@ -145,10 +165,10 @@ class Matlab:
 
     def send_message(self, msg_type, **kwargs):
         """Send a message and return the response"""
-        kwargs = self.encode_values(kwargs)
+        kwargs = self._encode_values(kwargs)
         self.socket.send_json(dict(kwargs, type=msg_type))
         response = self.socket.recv_json()
-        response = self.decode_values(response)
+        response = self._decode_values(response)
         if response['type'] == 'error':
             # Create a pretty backtrace almost like Python's:
             trace = 'Traceback (most recent call last):\n'
@@ -156,53 +176,59 @@ class Matlab:
                 response['stack'] = [response['stack']]
             for frame in reversed(response['stack']):
                 trace += '  File "{file}", line {line}, in {name}\n'.format(**frame)
-                if frame['file'].endswith('.m'):
+                if frame['file'] is not None and frame['file'].endswith('.m'):
                     trace += '    ' + open(frame['file'], 'r').readlines()[frame['line']-1].strip(' ')
             raise MatlabError('{message} ({identifier})\n'.format(**response) + trace,
                               response['stack'], response['identifier'], response['message'])
         return response
 
-    def encode_values(self, data):
+    def _encode_values(self, data):
+        """Recursively walk through data and encode special entries."""
         if isinstance(data, np.ndarray):
-            return self.encode_matrix(data)
-        elif isinstance(data, ProxyObject):
-            return self.encode_proxy(data)
+            return self._encode_matrix(data)
+        elif isinstance(data, MatlabProxyObject):
+            return self._encode_proxy(data)
         elif isinstance(data, dict):
             out = {}
             for key in data:
-                out[key] = self.encode_values(data[key])
+                out[key] = self._encode_values(data[key])
         elif isinstance(data, list) or isinstance(data, tuple):
             out = list(data)
             for idx in range(len(data)):
-                out[idx] = self.encode_values(data[idx])
+                out[idx] = self._encode_values(data[idx])
         else:
             out = data
         return out
 
-    def decode_values(self, data):
+    def _decode_values(self, data):
+        """Recursively walk through data and decode special entries."""
         if (isinstance(data, list) and
             len(data) == 4 and
             data[0] == "__matrix__"):
-            return self.decode_matrix(data)
+            return self._decode_matrix(data)
         elif (isinstance(data, list) and
             len(data) == 2 and
-            data[0] == "__proxy__"):
-            return self.decode_proxy(data)
+            data[0] == "__object__"):
+            return self._decode_proxy(data)
+        elif (isinstance(data, list) and
+            len(data) == 2 and
+            data[0] == "__function__"):
+            return self._decode_function(data)
         elif isinstance(data, dict):
             out = {}
             for key in data:
-                out[key] = self.decode_values(data[key])
+                out[key] = self._decode_values(data[key])
         elif isinstance(data, list) or isinstance(data, tuple):
             out = list(data)
             for idx in range(len(data)):
-                out[idx] = self.decode_values(data[idx])
+                out[idx] = self._decode_values(data[idx])
         else:
             out = data
         return out
 
 
-    def encode_matrix(self, data):
-        """Recursively walk through data and encode all matrices as JSON data.
+    def _encode_matrix(self, data):
+        """Encode a Numpy array as a special list.
 
         The matrix `np.array([[1, 2], [3, 4]], dtype='int32')` would
         be encoded as
@@ -217,8 +243,8 @@ class Matlab:
         return ["__matrix__", data.dtype.name, data.shape,
                 base64.encodebytes(data.tostring()).decode()]
 
-    def decode_matrix(self, data):
-        """Recursively walk through data and decode all matrices to np.ndarray
+    def _decode_matrix(self, data):
+        """Decode a special list to a Numpy array.
 
         The matrix `np.array([[1, 2], [3, 4]], dtype='int32')` would
         be encoded as
@@ -234,18 +260,28 @@ class Matlab:
         out = np.fromstring(base64.decodebytes(data.encode()), dtype)
         return out.reshape(*shape)
 
-    def encode_proxy(self, data):
-        """A proxy with handle `42` would be be encoded as `["__proxy__", 42]`
-        """
-
-        return ["__proxy__", data.handle]
-
-    def decode_proxy(self, data):
-        """Recursively walk through data and decode all proxy objects.
+    def _encode_proxy(self, data):
+        """Encode a MatlabProxyObject as a special list.
 
         A proxy with handle `42` would be be encoded as
-        `["__proxy__", 42]`
+        `["__object__", 42]`
 
         """
+        return ["__object__", data.handle]
 
-        return ProxyObject(self, data[1])
+    def _decode_proxy(self, data):
+        """Decode a special list to a MatlabProxyObject.
+
+        A proxy with handle `42` would be be encoded as
+        `["__object__", 42]`
+
+        """
+        return MatlabProxyObject(self, data[1])
+
+    def _decode_function(self, data):
+        """Decode a special list to a wrapper function."""
+
+        def call_matlab(*args, nargout=-1):
+                return self._call(data[1], args, nargout=nargout)
+        call_matlab.__doc__, _ = self._call('help', [data[1]])
+        return call_matlab

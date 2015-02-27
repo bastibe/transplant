@@ -8,10 +8,14 @@
 %    Depending on the message type, other keys may or may not be set.
 %
 %    TRANSPLANT implements the following message types:
-%    - 'eval': evaluates the 'string' of the message.
 %    - 'die': closes the 0MQ session and quits Matlab.
 %    - 'set': saves the 'value' as a global variable called 'name'.
-%    - 'get': retrieve the global variable 'name'.
+%    - 'get': retrieve the value of a global variable 'name'.
+%    - 'set_proxy': saves the 'value' as a field called 'name' on cached
+%                   object 'handle'.
+%    - 'get_proxy': retrieves the field called 'name' on cached object
+%                   'handle'.
+%    - 'del_proxy': remove cached object 'handle'.
 %    - 'call': call function 'name' with 'args' and 'nargout'.
 %
 %    TRANSPLANT implements the following responses:
@@ -19,8 +23,11 @@
 %    - 'error': there was an error while handling the message.
 %    - 'value': returns a value.
 %
-%    `set`, `get`, and `call` use a special encoding for matrices. See
-%    `encode_matrices` and `decode_matrices` for more detail.
+%    To enable cross-language functions, objects and matrices, these are
+%    encoded specially when transmitted between Python and Matlab:
+%    - Matrices are encoded as {"__matrix__", ... }
+%    - Functions are encoded as {"__function__", str2func(f) }
+%    - Objects are encoded as {"__object__", handle }
 
 % (c) 2014 Bastian Bechtold
 
@@ -37,52 +44,37 @@ function transplant(url)
 
         try
             switch msg.type
-                case 'die'
+                case 'die' % exit matlab
                     send_ack();
                     quit;
-                case 'eval'
-                    % get the number of output arguments
-                    if isfield(msg, 'nargout') && msg.nargout >= 0
-                        results = cell(msg.nargout, 1);
-                        [results{:}] = evalin('base', msg.string);
-                        if length(results) == 1
-                            send_value(results{1});
-                        else
-                            send_value(results);
-                        end
-                    else
-                        % try to get output from ans:
-                        evalin('base', 'clear ans');
-                        evalin('base', msg.string);
-                        try
-                            ans = evalin('base', 'ans');
-                            send_value(ans);
-                        catch err
-                            send_ack();
-                        end
-                    end
-                case 'set'
+                case 'set' % save msg.value as a global variable
                     assignin('base', msg.name, msg.value);
                     send_ack();
-                case 'get'
-                    if isempty(evalin('base', ['who(''' msg.name ''')']))
+                case 'get' % retrieve the value of a global variable
+                    % value does not exist:
+                    if exist(msg.name) == 0
                         error('TRANSPLANT:novariable' , ...
-                            ['Undefined variable ''' msg.name '''.']);
+                              ['Undefined variable ''' msg.name '''.']);
+                    % value is a function:
+                    elseif any(exist(msg.name) == [2, 3, 5, 6])
+                        value = str2func(msg.name);
+                    else
+                        value = evalin('base', msg.name);
                     end
-                    value = evalin('base', msg.name);
                     send_value(value);
-                case 'set_proxy'
+                case 'set_proxy' % set field value of a cached object
                     obj = proxied_objects{msg.handle};
                     set(obj, msg.name, msg.value);
                     send_ack();
-                case 'get_proxy'
+                case 'get_proxy' % retrieve field value of a cached object
                     obj = proxied_objects{msg.handle};
                     value = get(obj, msg.name);
                     send_value(value);
-                case 'del_proxy'
+                case 'del_proxy' % invalidate cached object
                     proxied_objects{msg.handle} = [];
-                case 'call'
-                    fun = evalin('base', ['@' msg.name]);
+                    send_ack();
+                case 'call' % call a function
+                    fun = str2func(msg.name);
 
                     % get the number of output arguments
                     if isfield(msg, 'nargout') && msg.nargout >= 0
@@ -117,23 +109,48 @@ function transplant(url)
         end
     end
 
-    function [out] = encode_object(object)
-        if length(object) > 1
-            out = {};
-            for n=1:length(object)
-                out{n} = encode_object(object(n));
-            end
-        else
-            proxied_objects{length(proxied_objects)+1} = object;
-            out = {'__proxy__', length(proxied_objects)};
-        end
+    % Send a message
+    %
+    % This is the base function for the specialized senders below
+    function send_message(message_type, message)
+        message.type = message_type;
+        messenger('send', dumpjson(message));
     end
 
+    % Send an acknowledgement message
+    function send_ack()
+        send_message('ack', struct());
+    end
+
+    % Send an error message
+    function send_error(err)
+        message.identifier = err.identifier;
+        message.message = err.message;
+        message.stack = err.stack;
+        send_message('error', message);
+    end
+
+    % Send a message that contains a value
+    function send_value(value)
+        message.value = encode_values(value);
+        send_message('value', message);
+    end
+
+    % Wait for and receive a message
+    function message = receive_msg()
+        blob = messenger('receive');
+        message = decode_values(parsejson(blob));
+    end
+
+    % recursively step through value and encode all occurrences of
+    % matrices, objects and functions as special cell arrays.
     function [value] = encode_values(value)
         if isnumeric(value) && (any(size(value) > 1) || ~isreal(value))
             value = encode_matrix(value);
         elseif isobject(value)
             value = encode_object(value);
+        elseif isa(value, 'function_handle')
+            value = {'__function__', func2str(value)};
         elseif iscell(value)
             for idx=1:numel(value)
                 value{idx} = encode_values(value{idx});
@@ -149,11 +166,15 @@ function transplant(url)
         end
     end
 
+    % recursively step through value and decode all special cell arrays
+    % that contain matrices, objects, or functions.
     function [value] = decode_values(value)
         if iscell(value) && numel(value) == 4 && strcmp(value{1}, '__matrix__')
             value = decode_matrix(value);
-        elseif iscell(value) && numel(value) == 2 && strcmp(value{1}, '__proxy__')
+        elseif iscell(value) && numel(value) == 2 && strcmp(value{1}, '__object__')
             value = proxied_objects{value{2}};
+        elseif iscell(value) && numel(value) == 2 && strcmp(value{1}, '__function__')
+            value = str2func(value{2});
         elseif iscell(value)
             for idx=1:numel(value)
                 value{idx} = decode_values(value{idx});
@@ -169,39 +190,24 @@ function transplant(url)
         end
     end
 
-    % Send a message that contains a value
-    function send_value(value)
-        msg.value = encode_values(value);
-        send_msg('value', msg);
+    % Objects are cached, and they are encoded as special cell arrays
+    % `{"__object__", cache_index}`
+    function [out] = encode_object(object)
+        if length(object) > 1
+            out = {};
+            for n=1:length(object)
+                out{n} = encode_object(object(n));
+            end
+        else
+            first_empty_entry = find(cellfun('isempty', proxied_objects), 1);
+            if isempty(first_empty_entry)
+                first_empty_entry = length(proxied_objects)+1;
+            end
+            proxied_objects{first_empty_entry} = object;
+            out = {'__object__', first_empty_entry};
+        end
     end
 
-    % Wait for and receive a message
-    function msg = receive_msg()
-        blob = messenger('receive');
-        msg = decode_values(parsejson(blob));
-    end
-
-end
-
-% Send a message
-%
-% This is the base function for the specialized senders below
-function send_msg(msg_type, msg)
-    msg.type = msg_type;
-    messenger('send', dumpjson(msg));
-end
-
-% Send an acknowledgement message
-function send_ack()
-    send_msg('ack', struct());
-end
-
-% Send an error message
-function send_error(err)
-    msg.identifier = err.identifier;
-    msg.message = err.message;
-    msg.stack = err.stack;
-    send_msg('error', msg);
 end
 
 % The matrix `np.array([[1, 2], [3, 4]], dtype='int32')` would be
