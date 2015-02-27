@@ -110,7 +110,7 @@ function [obj, idx] = object(json, idx, str_tokens, num_tokens)
                 error('JSON:parse:string:noquote', ...
                       ['string must start with " (char ' num2str(idx) ')']);
             end
-            [k, idx] = string(json, idx, str_tokens);
+            [key, idx] = string(json, idx, str_tokens);
             idx = next(json, idx);
             if json(idx) == ':'
                 idx = idx+1;
@@ -120,12 +120,8 @@ function [obj, idx] = object(json, idx, str_tokens, num_tokens)
                        '" (char ' num2str(idx) ')']);
             end
             idx = next(json, idx);
-            [v, idx] = value(json, idx, str_tokens, num_tokens);
-            if ~isletter(k(1))
-                obj.(['alpha__' k]) = v;
-            else
-                obj.(k) = v;
-            end
+            [val, idx] = value(json, idx, str_tokens, num_tokens);
+            obj.(genvarname(key)) = val; % make sure it's a valid name
             idx = next(json, idx);
             if json(idx) == ','
                 idx = idx+1;
@@ -155,8 +151,8 @@ function [obj, idx] = array(json, idx, str_tokens, num_tokens)
     idx = next(json, idx);
     if json(idx) ~= ']'
         while 1
-            [v, idx] = value(json, idx, str_tokens, num_tokens);
-            obj = [obj, {v}];
+            [val, idx] = value(json, idx, str_tokens, num_tokens);
+            obj = [obj, {val}];
             idx = next(json, idx);
             if json(idx) == ','
                 idx = idx+1;
