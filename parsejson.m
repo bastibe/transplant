@@ -77,9 +77,9 @@ function tokens = tokenize_strings(s)
 end
 
 function s = unescape_strings(s)
-    s = regexprep(s, '\\[trnfb]', '${sprintf($0)}');
+    s = regexprep(s, '(?<!\\)\\[trnfb]', '${sprintf($0)}');
     s = strrep(s, '\/', '/');
-    s = regexprep(s, '\\u([0-9a-f]{4})', '${char(hex2dec($1))}');
+    s = regexprep(s, '(?<!\\)\\u([0-9a-f]{4})', '${char(hex2dec($1))}');
 end
 
 function tokens = tokenize_numbers(s)
