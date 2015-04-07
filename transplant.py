@@ -91,20 +91,34 @@ class MatlabProxyObject:
 class Matlab:
     """An instance of Matlab, running in its own process."""
 
-    def __init__(self, executable='matlab', arguments=('-nodesktop', '-nosplash')):
+    def __init__(self, executable='matlab', arguments=('-nodesktop', '-nosplash'), address=None, user=None):
         """Starts a Matlab instance and opens a communication channel."""
-        self.ipcfile = tempfile.NamedTemporaryFile()
+        if address is None:
+            self.ipcfile = tempfile.NamedTemporaryFile()
+            zmq_address = 'ipc://' + self.ipcfile.name
+            process_arguments = ([executable] + list(arguments) +
+                                 ['-r', 'transplant {}'.format(zmq_address)])
+        else:
+            # get local IP address
+            from socket import create_connection
+            with create_connection((address, 22)) as s:
+                local_address, _ = s.getsockname()
+            # generate a random port number
+            from random import randint
+            port = randint(49152, 65535)
+            zmq_address = 'tcp://' + local_address + ':' + str(port)
+            if user is not None:
+                address = '{}@{}'.format(user, address)
+            process_arguments = (['ssh', address, executable, '-wait'] + list(arguments) +
+                                 ['-r', '"transplant {}"'.format(zmq_address)])
         self.context = zmq.Context.instance()
         self.socket = self.context.socket(zmq.REQ)
-        self.socket.bind('ipc://' + self.ipcfile.name)
+        self.socket.bind(zmq_address)
         # start Matlab, but make sure that it won't eat the REPL stdin
         # (stdin=DEVNULL), and that it won't respond to signals like
         # C-c of the REPL (start_new_session=True).
-        self.process = Popen([executable] + list(arguments) +
-                             ['-r', "addpath('{}'); transplant {}"
-                              .format(dirname(__file__),
-                                      'ipc://' + self.ipcfile.name)],
-                             stdin=DEVNULL, stdout=PIPE, start_new_session=True)
+        self.process = Popen(process_arguments, stdin=DEVNULL, stdout=PIPE,
+                             start_new_session=True)
         self._start_reader()
         self.eval('close') # no-op. Wait for Matlab startup to complete.
 
