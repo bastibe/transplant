@@ -11,7 +11,7 @@
 #include "zmq.h"
 
 void *ctx = NULL;
-void *socket = NULL;
+void *sock = NULL;
 
 /* Create the socket and start 0MQ */
 void open(int nlhs, mxArray *plhs[],
@@ -21,16 +21,16 @@ void open(int nlhs, mxArray *plhs[],
         mexErrMsgTxt("Missing argument: socket address");
     }
 
-    char *socket_addr = mxArrayToString(prhs[1]);
+    char *sock_addr = mxArrayToString(prhs[1]);
 
-    if (!socket_addr) {
+    if (!sock_addr) {
         mexErrMsgTxt("Cannot read socket address");
     }
 
     ctx = zmq_ctx_new();
-    socket = zmq_socket(ctx, ZMQ_REP);
+    sock = zmq_socket(ctx, ZMQ_REP);
 
-    if (!socket) {
+    if (!sock) {
         switch (errno) {
         case EINVAL:
             mexErrMsgTxt("The requested socket type is invalid");
@@ -48,7 +48,7 @@ void open(int nlhs, mxArray *plhs[],
         }
     }
 
-    int err = zmq_connect(socket, socket_addr);
+    int err = zmq_connect(sock, sock_addr);
 
     if (err) {
         switch (errno) {
@@ -89,7 +89,7 @@ void receive(int nlhs, mxArray *plhs[],
         mexErrMsgTxt("Unknown ZMQ error");
     }
 
-    int msglen = zmq_msg_recv(&msg, socket, 0);
+    int msglen = zmq_msg_recv(&msg, sock, 0);
     if (msglen == -1) {
         switch (errno) {
         case EAGAIN:
@@ -128,7 +128,7 @@ void receive(int nlhs, mxArray *plhs[],
         }
     }
 
-    char *data = mxCalloc(msglen+1, 1); /* one more NUL as terminator */
+    char *data = (char*)mxCalloc(msglen+1, 1); /* one more NUL as terminator */
     memcpy((void*)data, zmq_msg_data(&msg), msglen);
     plhs[0] = mxCreateString(data);
     err = zmq_msg_close(&msg);
@@ -153,7 +153,7 @@ void send(int nlhs, mxArray *plhs[],
     size_t msglen = mxGetNumberOfElements(prhs[1]);
     char *msg_out = mxArrayToString(prhs[1]);
 
-    size_t sentlen = zmq_send(socket, msg_out, msglen, 0);
+    size_t sentlen = zmq_send(sock, msg_out, msglen, 0);
 
     if (msglen != sentlen) {
         switch (errno) {
@@ -199,7 +199,7 @@ void send(int nlhs, mxArray *plhs[],
 void close(int nlhs, mxArray *plhs[],
            int nrhs, const mxArray *prhs[]) {
 
-    int err = zmq_close(socket);
+    int err = zmq_close(sock);
     err |= zmq_term(ctx);
 
     if (err) {
