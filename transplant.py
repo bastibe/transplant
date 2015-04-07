@@ -89,7 +89,17 @@ class MatlabProxyObject:
 
 
 class Matlab:
-    """An instance of Matlab, running in its own process."""
+    """An instance of Matlab, running in its own process.
+
+    if `address` is supplied, Matlab is started on a remote machine.
+    This is done by opening an SSH connection to that machine
+    (optionally using user account `user`), and then starting Matlab
+    on that machine. For this to work, `address` must be reachable
+    using SSH, `matlab` must be in the `user`'s PATH, and `transplant`
+    must be in Matlab's `path` and `messenger` must be available on
+    both the local and the remote machine.
+
+    """
 
     def __init__(self, executable='matlab', arguments=('-nodesktop', '-nosplash'), address=None, user=None):
         """Starts a Matlab instance and opens a communication channel."""
