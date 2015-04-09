@@ -4,7 +4,6 @@ import tempfile
 import zmq
 import numpy as np
 import base64
-from os.path import dirname
 from threading import Thread
 
 
@@ -49,88 +48,23 @@ encoded specially when transmitted between Python and Matlab:
 """
 
 
-class MatlabError(RuntimeError):
-    """An exception that retains some Matlab-specific metadata."""
+class TransplantError(RuntimeError):
+    """An exception that retains some Remote-specific metadata."""
 
     def __init__(self, message, stack, identifier, original_message):
-        super(MatlabError, self).__init__(message)
+        super(TransplantError, self).__init__(message)
         self.stack = stack
         self.identifier = identifier
         self.original_message = original_message
 
 
-class MatlabProxyObject:
-    """Forwards all property access to an associated Matlab object."""
 
-    def __init__(self, process, handle):
-        self.__dict__['handle'] = handle
-        self.__dict__['process'] = process
+class Transplant:
 
-    def _getAttributeNames(self):
-        return self.process.fieldnames(self)
+    ProxyObject = None
 
-    def __getattr__(self, name):
-        return self.process._get_proxy(self.handle, name)
-
-    def __setattr__(self, name, value):
-        self.process._set_proxy(self.handle, name, value)
-
-    def __repr__(self):
-        getclass = self.process.str2func('class')
-        return "<proxy for Matlab {} object>".format(getclass(self))
-
-    def __str__(self):
-        # remove pseudo-html tags from Matlab output
-        html_str = self.process.eval("@(x) evalc('disp(x)')")(self)
-        return re.sub('</?a[^>]*>', '', html_str)
-
-    def __del__(self):
-        self.process._del_proxy(self.handle)
-
-
-class Matlab:
-    """An instance of Matlab, running in its own process.
-
-    if `address` is supplied, Matlab is started on a remote machine.
-    This is done by opening an SSH connection to that machine
-    (optionally using user account `user`), and then starting Matlab
-    on that machine. For this to work, `address` must be reachable
-    using SSH, `matlab` must be in the `user`'s PATH, and `transplant`
-    must be in Matlab's `path` and `messenger` must be available on
-    both the local and the remote machine.
-
-    """
-
-    def __init__(self, executable='matlab', arguments=('-nodesktop', '-nosplash'), address=None, user=None):
-        """Starts a Matlab instance and opens a communication channel."""
-        if address is None:
-            self.ipcfile = tempfile.NamedTemporaryFile()
-            zmq_address = 'ipc://' + self.ipcfile.name
-            process_arguments = ([executable] + list(arguments) +
-                                 ['-r', 'transplant {}'.format(zmq_address)])
-        else:
-            # get local IP address
-            from socket import create_connection
-            with create_connection((address, 22)) as s:
-                local_address, _ = s.getsockname()
-            # generate a random port number
-            from random import randint
-            port = randint(49152, 65535)
-            zmq_address = 'tcp://' + local_address + ':' + str(port)
-            if user is not None:
-                address = '{}@{}'.format(user, address)
-            process_arguments = (['ssh', address, executable, '-wait'] + list(arguments) +
-                                 ['-r', '"transplant {}"'.format(zmq_address)])
-        self.context = zmq.Context.instance()
-        self.socket = self.context.socket(zmq.REQ)
-        self.socket.bind(zmq_address)
-        # start Matlab, but make sure that it won't eat the REPL stdin
-        # (stdin=DEVNULL), and that it won't respond to signals like
-        # C-c of the REPL (start_new_session=True).
-        self.process = Popen(process_arguments, stdin=DEVNULL, stdout=PIPE,
-                             start_new_session=True)
-        self._start_reader()
-        self.eval('close') # no-op. Wait for Matlab startup to complete.
+    def __init__(self, address):
+        pass
 
     def _set_value(self, name, value):
         """Save a value as a named variable."""
@@ -151,22 +85,22 @@ class Matlab:
         return response['value']
 
     def _del_proxy(self, handle):
-        """Tell Matlab to forget about this proxy object."""
+        """Tell the remote to forget about this proxy object."""
         self.send_message('del_proxy', handle=handle)
 
     def __getattr__(self, name):
-        """Retrieve a value or function from Matlab."""
+        """Retrieve a value or function from the remote."""
         return self._get_value(name)
 
     def __setattr__(self, name, value):
-        """Retrieve a value or function from Matlab."""
+        """Retrieve a value or function from the remote."""
         if name in ['ipcfile', 'context', 'socket', 'process']:
             self.__dict__[name] = value
         else:
             self._set_value(name, value)
 
     def _call(self, name, args, nargout=-1):
-        """Call a Matlab function."""
+        """Call a function on the remote."""
         args = list(args)
         response = self.send_message('call', name=name, args=args,
                                      nargout=nargout)
@@ -174,10 +108,10 @@ class Matlab:
             return response['value']
 
     def _start_reader(self):
-        """Starts an asynchronous reader that echos everything Matlab says"""
+        """Starts an asynchronous reader that echos everything the remote says"""
         stdout = self.process.stdout
         def reader():
-            """Echo what Matlab says using print"""
+            """Echo what the remote says using print"""
             for line in iter(stdout.readline, bytes()):
                 print(line.decode(), end='')
         Thread(target=reader, daemon=True).start()
@@ -202,7 +136,7 @@ class Matlab:
                 trace += '  File "{file}", line {line}, in {name}\n'.format(**frame)
                 if frame['file'] is not None and frame['file'].endswith('.m'):
                     trace += '    ' + open(frame['file'], 'r').readlines()[frame['line']-1].strip(' ')
-            raise MatlabError('{message} ({identifier})\n'.format(**response) + trace,
+            raise TransplantError('{message} ({identifier})\n'.format(**response) + trace,
                               response['stack'], response['identifier'], response['message'])
         return response
 
@@ -210,7 +144,7 @@ class Matlab:
         """Recursively walk through data and encode special entries."""
         if isinstance(data, np.ndarray):
             return self._encode_matrix(data)
-        elif isinstance(data, MatlabProxyObject):
+        elif isinstance(data, self.ProxyObject):
             return self._encode_proxy(data)
         elif isinstance(data, dict):
             out = {}
@@ -285,7 +219,7 @@ class Matlab:
         return out.reshape(*shape)
 
     def _encode_proxy(self, data):
-        """Encode a MatlabProxyObject as a special list.
+        """Encode a ProxyObject as a special list.
 
         A proxy with handle `42` would be be encoded as
         `["__object__", 42]`
@@ -294,18 +228,101 @@ class Matlab:
         return ["__object__", data.handle]
 
     def _decode_proxy(self, data):
-        """Decode a special list to a MatlabProxyObject.
+        """Decode a special list to a ProxyObject.
 
         A proxy with handle `42` would be be encoded as
         `["__object__", 42]`
 
         """
-        return MatlabProxyObject(self, data[1])
+        return self.ProxyObject(self, data[1])
+
+    def _decode_function(self, data):
+        """Decode a special list to a wrapper function."""
+
+        def call_remote(*args, nargout=-1):
+            return self._call(data[1], args, nargout=nargout)
+        return call_remote
+
+
+class MatlabProxyObject:
+    """Forwards all property access to an associated Matlab object."""
+
+    def __init__(self, process, handle):
+        self.__dict__['handle'] = handle
+        self.__dict__['process'] = process
+
+    def _getAttributeNames(self):
+        return self.process.fieldnames(self)
+
+    def __getattr__(self, name):
+        return self.process._get_proxy(self.handle, name)
+
+    def __setattr__(self, name, value):
+        self.process._set_proxy(self.handle, name, value)
+
+    def __repr__(self):
+        getclass = self.process.str2func('class')
+        return "<proxy for Matlab {} object>".format(getclass(self))
+
+    def __str__(self):
+        # remove pseudo-html tags from Matlab output
+        html_str = self.process.eval("@(x) evalc('disp(x)')")(self)
+        return re.sub('</?a[^>]*>', '', html_str)
+
+    def __del__(self):
+        self.process._del_proxy(self.handle)
+
+
+class Matlab(Transplant):
+    """An instance of Matlab, running in its own process.
+
+    if `address` is supplied, Matlab is started on a remote machine.
+    This is done by opening an SSH connection to that machine
+    (optionally using user account `user`), and then starting Matlab
+    on that machine. For this to work, `address` must be reachable
+    using SSH, `matlab` must be in the `user`'s PATH, and `transplant`
+    must be in Matlab's `path` and `messenger` must be available on
+    both the local and the remote machine.
+
+    """
+
+    ProxyObject = MatlabProxyObject
+
+    def __init__(self, executable='matlab', arguments=('-nodesktop', '-nosplash'), address=None, user=None):
+        """Starts a Matlab instance and opens a communication channel."""
+        if address is None:
+            self.ipcfile = tempfile.NamedTemporaryFile()
+            zmq_address = 'ipc://' + self.ipcfile.name
+            process_arguments = ([executable] + list(arguments) +
+                                 ['-r', 'transplant_remote {}'.format(zmq_address)])
+        else:
+            # get local IP address
+            from socket import create_connection
+            with create_connection((address, 22)) as s:
+                local_address, _ = s.getsockname()
+            # generate a random port number
+            from random import randint
+            port = randint(49152, 65535)
+            zmq_address = 'tcp://' + local_address + ':' + str(port)
+            if user is not None:
+                address = '{}@{}'.format(user, address)
+            process_arguments = (['ssh', address, executable, '-wait'] + list(arguments) +
+                                 ['-r', '"transplant_remote {}"'.format(zmq_address)])
+        self.context = zmq.Context.instance()
+        self.socket = self.context.socket(zmq.REQ)
+        self.socket.bind(zmq_address)
+        # start Matlab, but make sure that it won't eat the REPL stdin
+        # (stdin=DEVNULL), and that it won't respond to signals like
+        # C-c of the REPL (start_new_session=True).
+        self.process = Popen(process_arguments, stdin=DEVNULL, stdout=PIPE,
+                             start_new_session=True)
+        self._start_reader()
+        self.eval('close') # no-op. Wait for Matlab startup to complete.
 
     def _decode_function(self, data):
         """Decode a special list to a wrapper function."""
 
         def call_matlab(*args, nargout=-1):
-                return self._call(data[1], args, nargout=nargout)
+            return self._call(data[1], args, nargout=nargout)
         call_matlab.__doc__, _ = self._call('help', [data[1]])
         return call_matlab
