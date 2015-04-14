@@ -58,8 +58,15 @@ class TransplantError(RuntimeError):
         self.original_message = original_message
 
 
+class TransplantMaster:
+    """Base class for Transplant Master objects.
 
-class Transplant:
+    This starts a subprocess and opens a communications channel to
+    that process using ZMQ. This class handles data serialization and
+    communication. In order to use this class, the `ProxyObject` and
+    `__init__` have to be overloaded.
+
+    """
 
     ProxyObject = None
 
@@ -99,11 +106,11 @@ class Transplant:
         else:
             self._set_value(name, value)
 
-    def _call(self, name, args, nargout=-1):
+    def _call(self, name, args=[], kwargs=[]):
         """Call a function on the remote."""
         args = list(args)
-        response = self.send_message('call', name=name, args=args,
-                                     nargout=nargout)
+        kwargs = dict(kwargs)
+        response = self.send_message('call', name=name, args=args, kwargs=kwargs)
         if response['type'] == 'value':
             return response['value']
 
@@ -184,7 +191,6 @@ class Transplant:
             out = data
         return out
 
-
     def _encode_matrix(self, data):
         """Encode a Numpy array as a special list.
 
@@ -239,8 +245,8 @@ class Transplant:
     def _decode_function(self, data):
         """Decode a special list to a wrapper function."""
 
-        def call_remote(*args, nargout=-1):
-            return self._call(data[1], args, nargout=nargout)
+        def call_remote(*args, **kwargs):
+            return self._call(data[1], args, kwargs)
         return call_remote
 
 
@@ -273,16 +279,16 @@ class MatlabProxyObject:
         self.process._del_proxy(self.handle)
 
 
-class Matlab(Transplant):
+class Matlab(TransplantMaster):
     """An instance of Matlab, running in its own process.
 
     if `address` is supplied, Matlab is started on a remote machine.
     This is done by opening an SSH connection to that machine
     (optionally using user account `user`), and then starting Matlab
     on that machine. For this to work, `address` must be reachable
-    using SSH, `matlab` must be in the `user`'s PATH, and `transplant`
-    must be in Matlab's `path` and `messenger` must be available on
-    both the local and the remote machine.
+    using SSH, `matlab` must be in the `user`'s PATH, and
+    `transplant_remote` must be in Matlab's `path` and `messenger`
+    must be available on both the local and the remote machine.
 
     """
 
@@ -318,6 +324,14 @@ class Matlab(Transplant):
                              start_new_session=True)
         self._start_reader()
         self.eval('close') # no-op. Wait for Matlab startup to complete.
+
+    def _call(self, name, args, nargout=-1):
+        """Call a function on the remote."""
+        args = list(args)
+        response = self.send_message('call', name=name, args=args,
+                                     nargout=nargout)
+        if response['type'] == 'value':
+            return response['value']
 
     def _decode_function(self, data):
         """Decode a special list to a wrapper function."""
