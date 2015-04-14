@@ -66,6 +66,7 @@ function [json] = string(data)
     data = strrep(data, sprintf('\n'), '\n');
     data = strrep(data, sprintf('\r'), '\r');
     data = strrep(data, sprintf('\t'), '\t');
+    data = regexprep(data, '([^\x00-\x7F])', '\\u${sprintf(''%04s'', dec2hex($1))}');
     json = sprintf('"%s"', data);
 end
 
