@@ -25,8 +25,8 @@ Depending on the message type, other keys may or may not be set.
 
 There are seven request types sent by Python:
 - 'die': the server closes its 0MQ session and quits.
-- 'set': saves the 'value' as a global variable called 'name'.
-- 'get': retrieves the value of a global variable 'name'.
+- 'set_global': saves the 'value' as a global variable called 'name'.
+- 'get_global': retrieves the value of a global variable 'name'.
 - 'set_proxy': saves the 'value' as a field called 'name' on cached
                object 'handle'.
 - 'get_proxy': retrieves the field called 'name' on cached object
@@ -75,11 +75,11 @@ class TransplantMaster:
 
     def _set_global(self, name, value):
         """Save a value as a named variable."""
-        self.send_message('set', name=name, value=value)
+        self.send_message('set_global', name=name, value=value)
 
     def _get_global(self, name):
         """Retrieve a value from a named variable."""
-        response = self.send_message('get', name=name)
+        response = self.send_message('get_global', name=name)
         return response['value']
 
     def _set_proxy(self, handle, name, value):

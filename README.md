@@ -24,7 +24,7 @@ STARTING MATLAB
 ----------------
 
 ```python
-matlab = transplant.Matlab()
+matlab = transplant_master.Matlab()
 ```
 
 Will start a Matlab session and connect to it. This will take a few
@@ -36,14 +36,23 @@ function will not work.
 By default, this will try to call `matlab` on the command line. If you
 want to use a different version of Matlab, or `matlab` is not
 available on the command line, use
-`transplant.Matlab(executable='/path/to/matlab')`.
+`Matlab(executable='/path/to/matlab')`.
 
 By default, Matlab is called with `-nodesktop` and `-nosplash`, so no
 IDE or splash screen show up. If you want to use different arguments,
-you can supply them like this:
-`transplant.Matlab(arguments=('-nodesktop', '-nosplash', '-c
-licensefile' , '-nojvm'))`. Note that `'-nojvm'` will speed up startup
-considerably, but you won't be able to open figures any more.
+you can supply them like this: `Matlab(arguments=('-nodesktop',
+'-nosplash', '-c licensefile' , '-nojvm'))`. Note that `'-nojvm'` will
+speed up startup considerably, but you won't be able to open figures
+any more.
+
+By default, Matlab will be started on the local machine. To start
+Matlab on a different computer, supply the IP address of that
+computer: `Matlab(address='172.168.1.5')`. This only works if that
+computer is reachable through `ssh`, Matlab is available on the other
+computer's command line, and transplant is in the other Matlab's path.
+
+Note that due to a limitation of Matlab on Windows, command line
+output from Matlabs running on Windows aren't visible to Transplant.
 
 CALLING MATLAB 
 --------------
@@ -66,22 +75,23 @@ Input arguments are converted to Matlab data structures:
 - Dictionaries become structs
 - Numpy arrays become matrices
 
-If the function returns a function handle or an object, matching
-Python functions/objects will be created that forward every access to
-Matlab. When handed back to a Matlab function, they will work like as
-intended.
+If the function returns a function handle or an object, a matching
+Python functions/objects will be created that forwards every access to
+Matlab. These objects and functions can also be handed back to Matlab
+and will work as intended.
 
 ```python
-f = matlab.figure()
-f.Visible = 'off'
-matlab.set(f, 'Visible', 'on')
+f = matlab.figure() # create a Figure object
+f.Visible = 'off' # modify a property of the Figure object
+matlab.set(f, 'Visible', 'on') # pass the Figure object to a function
 ```
 
 In Matlab, some functions behave differently depending on the number
-of output arguments. By default, Transplant uses `nargout` in Matlab
-to figure out the number of return values for a function. If `nargout`
-does not know the number of output arguments either, Matlab functions
-will return the value of `ans` after the function call.
+of output arguments. By default, Transplant uses the Matlab function
+`nargout` to figure out the number of return values for a function. If
+`nargout` can not determine the number of output arguments either,
+Matlab functions will return the value of `ans` after the function
+call.
 
 In some cases, `nargout` will report a wrong number of output
 arguments. For example `nargout profile` will say `1`, but `x =
@@ -105,17 +115,17 @@ case.
 HOW DOES IT WORK?
 -----------------
 
-Transplant opens Matlab as a subprocess, then connects to it via
-[0MQ](http://zeromq.org/) in a request-response pattern. Matlab then
-runs the _transplant_ server and starts listening for messages. Now,
-Python can send messages to Matlab, and Matlab will respond. Roundtrip
-time for sending/receiving and encoding/decoding values from Python to
-Matlab and back is about 20 ms.
+Transplant opens Matlab as a subprocess (optionally over SSH), then
+connects to it via [0MQ](http://zeromq.org/) in a request-response
+pattern. Matlab then runs the _transplant_ remote and starts listening
+for messages. Now, Python can send messages to Matlab, and Matlab will
+respond. Roundtrip time for sending/receiving and encoding/decoding
+values from Python to Matlab and back is about 20 ms.
 
 All messages are JSON-encoded objects. There are seven messages types
 used by Python:
 
-* `set` and `get` set and retrieve a global variable.
+* `set_global` and `get_global` set and retrieve a global variable.
 * `set_proxy` and `get_proxy` and `del_proxy` to interact with cached
   Matlab objects.
 * `call` calls a Matlab function with some function arguments and
@@ -163,11 +173,17 @@ INSTALLATION
    they should be: `mex -lzmq messenger.c -I/usr/local/include
    -Dchar16_t=UINT16_T`.
 
-2. On the Python side, make sure to have PyZMQ and Numpy installed as
+2. Add the _messenger_ mexfile and *transplant_remote.m* to your
+   Matlab path.
+
+3. On the Python side, make sure to have PyZMQ and Numpy installed as
    well.
 
-3. If `matlab` is not reachable in your shell, give the full path to
+4. If `matlab` is not reachable in your shell, give the full path to
    your Matlab executable to the `Matlab` constructor.
+
+5. If you indent to start Matlab on a remote computer, make sure that
+   computer is reachable through SSH and fullfills the above steps.
 
 LICENSE
 -------

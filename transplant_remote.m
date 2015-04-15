@@ -9,8 +9,8 @@
 %
 %    TRANSPLANT implements the following message types:
 %    - 'die': closes the 0MQ session and quits Matlab.
-%    - 'set': saves the 'value' as a global variable called 'name'.
-%    - 'get': retrieve the value of a global variable 'name'.
+%    - 'set_global': saves the 'value' as a global variable called 'name'.
+%    - 'get_global': retrieve the value of a global variable 'name'.
 %    - 'set_proxy': saves the 'value' as a field called 'name' on cached
 %                   object 'handle'.
 %    - 'get_proxy': retrieves the field called 'name' on cached object
@@ -46,10 +46,10 @@ function transplant_remote(url)
                 case 'die' % exit matlab
                     send_ack();
                     quit;
-                case 'set' % save msg.value as a global variable
+                case 'set_global' % save msg.value as a global variable
                     assignin('base', msg.name, msg.value);
                     send_ack();
-                case 'get' % retrieve the value of a global variable
+                case 'get_global' % retrieve the value of a global variable
                     % simply evalin('base', msg.name) would call functions,
                     % so that can't be used.
                     existance = evalin('base', ['exist(''' msg.name ''')']);
