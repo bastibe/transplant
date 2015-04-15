@@ -216,25 +216,21 @@ function transplant_remote(url)
 
 end
 
-% The matrix `np.array([[1, 2], [3, 4]], dtype='int32')` would be
-% encoded as
-% `["__matrix__", "int32", [2, 2], "AQAAAAIAAAADAAAABAAAA==\n"]`
+% The matrix `int32([1 2; 3 4])` would be encoded as
+% `{'__matrix__', 'int32', [2, 2], 'AQAAAAIAAAADAAAABAAAA==\n'}`
 %
-% where `"int32"` is the data type, `[2, 2]` is the matrix shape and
-% `"AQAAAAIAAAADAAAABAAAA==\n"` is the base64-encoded matrix content.
+% where `'int32'` is the data type, `[2, 2]` is the matrix shape and
+% `'AQAAAAIAAAADAAAABAAAA==\n"'` is the base64-encoded matrix content.
 function [value] = encode_matrix(value)
     if ~isreal(value) && isinteger(value)
-        value = double(value); % Numpy does not know complex
+        value = double(value); % Numpy does not know complex int
     end
+    % convert to uint8 1-D array in row-major order
     if isreal(value)
-        % convert column-major (FORTRAN, Matlab) to
-        % row-major (C, Python)
         value = permute(value, length(size(value)):-1:1);
         binary = typecast(value(:), 'uint8');
     else
         % convert [complex, complex] into [real, imag, real, imag]
-        % since encodeBase64Chunked can only deal with real 1-D
-        % arrays.
         tmp = zeros(numel(value)*2, 1);
         if isa(value, 'single')
             tmp = single(tmp);
@@ -246,6 +242,7 @@ function [value] = encode_matrix(value)
     end
     if islogical(value)
         % convert logicals (bool) into one-byte-per-bit
+        value = permute(value, length(size(value)):-1:1);
         binary = cast(value,'uint8');
     end
     base64 = base64encode(binary);
@@ -269,12 +266,11 @@ function [value] = encode_matrix(value)
     value = {'__matrix__', dtype, fliplr(size(value)), base64};
 end
 
-% The matrix `np.array([[1, 2], [3, 4]], dtype='int32')` would be
-% encoded as
-% `["__matrix__", "int32", [2, 2], "AQAAAAIAAAADAAAABAAAA==\n"]`
+% The matrix `int32([1 2; 3 4])` would be encoded as
+% `{'__matrix__', 'int32', [2, 2], 'AQAAAAIAAAADAAAABAAAA==\n'}`
 %
-% where `"int32"` is the data type, `[2, 2]` is the matrix shape and
-% `"AQAAAAIAAAADAAAABAAAA==\n"` is the base64-encoded matrix content.
+% where `'int32'` is the data type, `[2, 2]` is the matrix shape and
+% `'AQAAAAIAAAADAAAABAAAA==\n'` is the base64-encoded matrix content.
 function [value] = decode_matrix(value)
     dtype = value{2};
     shape = cell2mat(value{3});
