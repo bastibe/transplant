@@ -73,11 +73,11 @@ class TransplantMaster:
     def __init__(self, address):
         pass
 
-    def _set_value(self, name, value):
+    def _set_global(self, name, value):
         """Save a value as a named variable."""
         self.send_message('set', name=name, value=value)
 
-    def _get_value(self, name):
+    def _get_global(self, name):
         """Retrieve a value from a named variable."""
         response = self.send_message('get', name=name)
         return response['value']
@@ -97,14 +97,14 @@ class TransplantMaster:
 
     def __getattr__(self, name):
         """Retrieve a value or function from the remote."""
-        return self._get_value(name)
+        return self._get_global(name)
 
     def __setattr__(self, name, value):
         """Retrieve a value or function from the remote."""
         if name in ['ipcfile', 'context', 'socket', 'process']:
             self.__dict__[name] = value
         else:
-            self._set_value(name, value)
+            self._set_global(name, value)
 
     def _call(self, name, args=[], kwargs=[]):
         """Call a function on the remote."""
