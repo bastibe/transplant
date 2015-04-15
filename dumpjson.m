@@ -1,7 +1,7 @@
 %DUMPJSON dumps Matlab data as a JSON string
 % DUMPJSON(DATA)
 %    recursively walks through DATA and creates a JSON string from it.
-%    - strings are converted to strings
+%    - strings are converted to strings with escape sequences
 %    - scalars are converted to numbers
 %    - logicals are converted to `true` and `false`
 %    - arrays are converted to arrays of numbers
@@ -11,10 +11,14 @@
 %    - cell matrices are converted to arrays of arrays
 %    - structs are converted to objects
 %    - struct arrays are converted to arrays of objects
+%    - function handles and matlab objects will raise an error.
 %
-%    function handles and
+%    In contrast to may other JSON parsers, this one does not try
+%    special-case numeric matrices. Also, this correctly transplates
+%    escape sequences in strings.
 
 % (c) 2014 Bastian Bechtold
+% This code is licensed under the BSD 3-clause license
 
 function [json] = dumpjson(data)
     if numel(data) > 10000
@@ -66,6 +70,8 @@ function [json] = string(data)
     data = strrep(data, sprintf('\n'), '\n');
     data = strrep(data, sprintf('\r'), '\r');
     data = strrep(data, sprintf('\t'), '\t');
+    % convert non-ASCII characters to `\uXXXX` sequences, where XXX is
+    % the hex unicode codepoint of the character.
     data = regexprep(data, '([^\x00-\x7F])', '\\u${sprintf(''%04s'', dec2hex($1))}');
     json = sprintf('"%s"', data);
 end

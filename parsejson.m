@@ -2,7 +2,7 @@
 % PARSEJSON(STRING)
 %    reads STRING as JSON data, and creates Matlab data structures
 %    from it.
-%    - strings are converted to strings
+%    - strings are converted to strings with escape sequences removed
 %    - numbers are converted to doubles
 %    - true, false are converted to logical 1, 0
 %    - null is converted to []
@@ -11,12 +11,14 @@
 %
 %    In contrast to many other JSON parsers, this one does not try to
 %    convert all-numeric arrays into matrices. Thus, nested data
-%    structures are encoded correctly.
+%    structures are encoded correctly. Also, this correctly translates
+%    escape sequences in strings.
 %
 %    This is a complete implementation of the JSON spec, and invalid
 %    data will generally throw errors.
 
 % (c) 2014 Bastian Bechtold
+% This code is licensed under the BSD 3-clause license
 
 function [obj] = parsejson(json)
     json = unescape_strings(json);
@@ -66,22 +68,44 @@ end
 function [obj, idx] = string(json, idx, str_tokens)
     stop = str_tokens(idx);
     obj = json(idx+1:stop-1);
-    obj = strrep(obj, '\"', '"');
+    % This regex replaces escaped quotes with quotes:
+    % Find (an even number of `\`) followed by `\"`
+    % and replace with the aforementioned `\` and `"`
+    obj = regexprep(obj, '((?<!\\)(?>\\\\)*)\\"', '$1"');
+    % replace escaped backslashes with backslashes:
     obj = strrep(obj, '\\', '\');
     idx = stop+1;
 end
 
+% searches for start and end points of strings, and returns their indices
 function tokens = tokenize_strings(s)
-    [string_start string_end] = regexp(s, '".*?(?<!\\)"');
+    % This regex finds the starting points and end points of all strings:
+    % Find strings that contain anything but backslashes or quotes, or
+    % several single backslash-escaped characters followed by anything
+    % but backslashes or quotes.
+    [string_start string_end] = regexp(s, '"[^"\\]*(?:\\.[^"\\]*)*"');
     tokens = sparse(string_start, ones(1, length(string_start)), string_end);
 end
 
+% replace all backslash-escaped sequences in all strings
 function s = unescape_strings(s)
-    s = regexprep(s, '(?<!\\)\\[trnfb]', '${sprintf($0)}');
-    s = strrep(s, '\/', '/');
-    s = regexprep(s, '(?<!\\)\\u([0-9a-fA-F]{4})', '${char(hex2dec($1))}');
+    % This does not replace escaped quotes or escaped backslashes
+    % since those mark beginnings and ends of JSON strings.
+
+    % These regexes mean:
+    % Find (an even number of `\`) followed by an escape sequence and
+    % replace with the aforementioned `\` and a replacement.
+
+    % replace `\t` with tab, `\r` with return, `\n` with newline,
+    % `\f` with formfeed and `\b` with backspace.
+    s = regexprep(s, '((?<!\\)(?>\\\\)*)(\\[trnfb])', '$1${sprintf($2)}');
+    % replace `\/` with `/`
+    s = regexprep(s, '((?<!\\)(?>\\\\)*)\\/', '$1/');
+    % replace `\uXXXX` with the unicode character at codepoint XXXX
+    s = regexprep(s, '((?<!\\)(?>\\\\)*)\\u([0-9a-fA-F]{4})', '$1${char(hex2dec($2))}');
 end
 
+% searches for start and end points of numbers, and returns their indices
 function tokens = tokenize_numbers(s)
     [string_start string_end] = regexp(s, '-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?');
     tokens = sparse(string_start, ones(1, length(string_start)), string_end);
