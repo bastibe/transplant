@@ -40,9 +40,8 @@ function transplant_remote(url)
 
     while 1 % main messaging loop
 
-        msg = decode_values(receive_msg());
-
         try
+            msg = decode_values(receive_msg());
             switch msg.type
                 case 'die' % exit matlab
                     send_ack();
@@ -172,15 +171,19 @@ function transplant_remote(url)
     % recursively step through value and decode all special cell arrays
     % that contain matrices, objects, or functions.
     function [value] = decode_values(value)
-        if iscell(value) && numel(value) == 4 && strcmp(value{1}, '__matrix__')
-            value = decode_matrix(value);
-        elseif iscell(value) && numel(value) == 2 && strcmp(value{1}, '__object__')
-            value = proxied_objects{value{2}};
-        elseif iscell(value) && numel(value) == 2 && strcmp(value{1}, '__function__')
-            value = str2func(value{2});
-        elseif iscell(value)
-            for idx=1:numel(value)
-                value{idx} = decode_values(value{idx});
+        if iscell(value)
+            len = numel(value);
+            special = len > 0 && ischar(value{1});
+            if special && len == 4 && strcmp(value{1}, '__matrix__')
+                value = decode_matrix(value);
+            elseif special && len == 2 && strcmp(value{1}, '__object__')
+                value = proxied_objects{value{2}};
+            elseif special && len == 2 && strcmp(value{1}, '__function__')
+                value = str2func(value{2});
+            else
+                for idx=1:numel(value)
+                    value{idx} = decode_values(value{idx});
+                end
             end
         elseif isstruct(value)
             keys = fieldnames(value);
