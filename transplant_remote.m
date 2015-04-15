@@ -31,7 +31,7 @@
 
 % (c) 2014 Bastian Bechtold
 
-function transplant(url)
+function transplant_remote(url)
 
     % start 0MQ:
     messenger('open', url)
@@ -51,12 +51,15 @@ function transplant(url)
                     assignin('base', msg.name, msg.value);
                     send_ack();
                 case 'get' % retrieve the value of a global variable
+                    % simply evalin('base', msg.name) would call functions,
+                    % so that can't be used.
+                    existance = evalin('base', ['exist(''' msg.name ''')']);
                     % value does not exist:
-                    if exist(msg.name) == 0
+                    if existance == 0
                         error('TRANSPLANT:novariable' , ...
                               ['Undefined variable ''' msg.name '''.']);
                     % value is a function:
-                    elseif any(exist(msg.name) == [2, 3, 5, 6])
+                    elseif any(existance == [2, 3, 5, 6])
                         value = str2func(msg.name);
                     else
                         value = evalin('base', msg.name);
