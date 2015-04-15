@@ -5,10 +5,15 @@
 %    stripped from the resulting bytes.
 
 % (c) 2014 Bastian Bechtold
+% This code is licensed under the BSD 3-clause license
 
 function bytes = base64decode(base64)
     % strip line breaks
     base64 = strrep(base64, sprintf('\n'), '');
+    % add padding if missing
+    if mod(length(base64), 4) ~= 0
+        base64 = [base64 repmat('=', [1 mod(length(base64), 4)])];
+    end
     % remember padding
     padding = sum(base64 == '=');
     % convert from string representation to base64 bytes

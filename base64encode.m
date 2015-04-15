@@ -5,6 +5,7 @@
 %    zeros and unused characters are replaced with '='.
 
 % (c) 2014 Bastian Bechtold
+% This code is licensed under the BSD 3-clause license
 
 function base64 = base64encode(bytes)
     % pad the base64 string to a multiple of 3
