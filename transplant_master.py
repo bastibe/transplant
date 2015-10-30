@@ -149,7 +149,7 @@ class TransplantMaster:
 
     def _encode_values(self, data):
         """Recursively walk through data and encode special entries."""
-        if isinstance(data, np.ndarray):
+        if isinstance(data, (np.ndarray, np.number)):
             return self._encode_matrix(data)
         elif isinstance(data, self.ProxyObject):
             return self._encode_proxy(data)
