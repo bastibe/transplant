@@ -6,7 +6,7 @@
 %    - logicals are converted to `true` and `false`
 %    - arrays are converted to arrays of numbers
 %    - matrices are converted to arrays of arrays of numbers
-%    - [] is converted to null
+%    - empty matrices are converted to null
 %    - cell arrays are converted to arrays
 %    - cell matrices are converted to arrays of arrays
 %    - structs are converted to objects

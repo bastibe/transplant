@@ -147,7 +147,8 @@ function transplant_remote(url)
     % recursively step through value and encode all occurrences of
     % matrices, objects and functions as special cell arrays.
     function [value] = encode_values(value)
-        if isnumeric(value) && (any(size(value) > 1) || ~isreal(value))
+        if (isnumeric(value) && numel(value) ~= 0 && ...
+            (numel(value) > 1 || ~isreal(value)))
             value = encode_matrix(value);
         elseif isobject(value)
             value = encode_object(value);
