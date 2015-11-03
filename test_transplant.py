@@ -1,4 +1,4 @@
-from transplant import Matlab
+from transplant import Matlab, TransplantError
 import numpy as np
 import pytest
 
@@ -16,11 +16,11 @@ def test_put_and_get(matlab):
     assert np.all(matlab.test == test_data)
 
 def test_invalid_get(matlab):
-    with pytest.raises(NameError):
+    with pytest.raises(TransplantError):
         matlab.foo
 
 def test_call(matlab):
-    size = matlab.call('size', [test_data])
+    size = matlab.size(test_data)
     assert np.all(size == test_data.shape)
 
 def test_interactive_call(matlab):
@@ -39,9 +39,3 @@ def test_nargout_two(matlab):
     max, idx = matlab.max(test_data, nargout=2)
     assert np.all(max == np.max(test_data, axis=0))
     assert np.all(idx-1 == np.argmax(test_data, axis=0))
-
-def test_data_type(matlab):
-    matlab.evalin('base', 'test = uint8([1 2 3; 4 5 6]);', nargout=0)
-    assert matlab.get('test').dtype == 'uint8'
-    matlab.test = np.array(test_data, dtype='int16')
-    assert matlab.evalin('base', 'class(test)', nargout=1) == 'int16'
