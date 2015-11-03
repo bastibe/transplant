@@ -291,7 +291,9 @@ end
 function [value] = decode_matrix(value)
     dtype = value{2};
     shape = cell2mat(value{3});
-    if length(shape) == 1
+    if length(shape) == 0
+        shape = [1 1];
+    elseif length(shape) == 1
         shape = [1 shape];
     end
     binary = base64decode(value{4});

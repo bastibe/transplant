@@ -151,6 +151,9 @@ class TransplantMaster:
         """Recursively walk through data and encode special entries."""
         if isinstance(data, (np.ndarray, np.number)):
             return self._encode_matrix(data)
+        elif isinstance(data, complex):
+            # encode python complex numbers as scalar numpy arrays
+            return self._encode_matrix(np.complex128(data))
         elif isinstance(data, self.ProxyObject):
             return self._encode_proxy(data)
         elif isinstance(data, dict):
