@@ -205,7 +205,7 @@ class TransplantMaster:
         """
 
         return ["__matrix__", data.dtype.name, data.shape,
-                base64.encodebytes(data.tostring()).decode()]
+                base64.b64encode(data.tostring()).decode()]
 
     def _decode_matrix(self, data):
         """Decode a special list to a Numpy array.
@@ -221,7 +221,7 @@ class TransplantMaster:
         """
 
         dtype, shape, data = data[1:]
-        out = np.fromstring(base64.decodebytes(data.encode()), dtype)
+        out = np.fromstring(base64.b64decode(data.encode()), dtype)
         return out.reshape(*shape)
 
     def _encode_proxy(self, data):
