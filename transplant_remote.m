@@ -243,8 +243,13 @@ function [value] = encode_matrix(value)
         value = double(value); % Numpy does not know complex int
     end
     % convert to uint8 1-D array in row-major order
+    if length(size(value)) > 2
+        row_major_order = [2, 1, 3:length(size(value))];
+    else
+        row_major_order = [2, 1];
+    end
     if isreal(value)
-        value = permute(value, length(size(value)):-1:1);
+        value = permute(value, row_major_order);
         binary = typecast(value(:), 'uint8');
     else
         % convert [complex, complex] into [real, imag, real, imag]
@@ -252,14 +257,14 @@ function [value] = encode_matrix(value)
         if isa(value, 'single')
             tmp = single(tmp);
         end
-        value = permute(value, length(size(value)):-1:1);
+        value = permute(value, row_major_order);
         tmp(1:2:end) = real(value(:));
         tmp(2:2:end) = imag(value(:));
         binary = typecast(tmp, 'uint8');
     end
     if islogical(value)
         % convert logicals (bool) into one-byte-per-bit
-        value = permute(value, length(size(value)):-1:1);
+        value = permute(value, row_major_order);
         binary = cast(value,'uint8');
     end
     base64 = base64encode(binary);
@@ -313,7 +318,12 @@ function [value] = decode_matrix(value)
     else
         value = typecast(binary, dtype);
     end
-    % convert row-major (C, Python) to column-major (FORTRAN, Matlab)
+    % convert row-major (C, Python) to whatever the hell Matlab thinks
+    % is a proper order of things.
     value = reshape(value, fliplr(shape));
-    value = permute(value, length(shape):-1:1);
+    if length(shape) > 2
+        value = permute(value, [2 1 3:length(shape)]);
+    else
+        value = permute(value, [2 1]);
+    end
 end
