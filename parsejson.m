@@ -22,10 +22,9 @@
 
 function [obj] = parsejson(json)
     json = unescape_strings(json);
-    str_tokens = tokenize_strings(json);
-    num_tokens = tokenize_numbers(json);
+    tokens = tokenize(json);
     idx = next(json, 1);
-    [obj, idx] = value(json, idx, str_tokens, num_tokens);
+    [obj, idx] = value(json, idx, tokens);
     idx = next(json, idx);
     if idx ~= length(json)+1
         error('JSON:parse:multipletoplevel', ...
@@ -41,16 +40,16 @@ function [idx] = next(json, idx)
 end
 
 % dispatches based on JSON type
-function [obj, idx] = value(json, idx, str_tokens, num_tokens)
+function [obj, idx] = value(json, idx, tokens)
     char = json(idx);
     if char == '"'
-        [obj, idx] = string(json, idx, str_tokens);
+        [obj, idx] = string(json, idx, tokens);
     elseif any(char == '0123456789-')
-        [obj, idx] = number(json, idx, num_tokens);
+        [obj, idx] = number(json, idx, tokens);
     elseif char == '{'
-        [obj, idx] = object(json, idx, str_tokens, num_tokens);
+        [obj, idx] = object(json, idx, tokens);
     elseif char == '['
-        [obj, idx] = array(json, idx, str_tokens, num_tokens);
+        [obj, idx] = array(json, idx, tokens);
     elseif char == 't'
         [obj, idx] = true(json, idx);
     elseif char == 'f'
@@ -65,26 +64,33 @@ function [obj, idx] = value(json, idx, str_tokens, num_tokens)
 end
 
 % parses a string and advances idx
-function [obj, idx] = string(json, idx, str_tokens)
-    stop = str_tokens(idx);
+function [obj, idx] = string(json, idx, tokens)
+    stop = tokens(idx);
     obj = json(idx+1:stop-1);
-    % This regex replaces escaped quotes with quotes:
-    % Find (an even number of `\`) followed by `\"`
-    % and replace with the aforementioned `\` and `"`
-    obj = regexprep(obj, '((?<!\\)(?>\\\\)*)\\"', '$1"');
+    if ~isempty(strfind(obj, '\"'))
+        % This regex replaces escaped quotes with quotes:
+        % Find (an even number of `\`) followed by `\"`
+        % and replace with the aforementioned `\` and `"`
+        obj = regexprep(obj, '((?<!\\)(?>\\\\)*)\\"', '$1"');
+    end
     % replace escaped backslashes with backslashes:
     obj = strrep(obj, '\\', '\');
     idx = stop+1;
 end
 
-% searches for start and end points of strings, and returns their indices
-function tokens = tokenize_strings(s)
+% searches for the start and end points of things, and returns their indices
+function tokens = tokenize(s)
     % This regex finds the starting points and end points of all strings:
     % Find strings that contain anything but backslashes or quotes, or
     % several single backslash-escaped characters followed by anything
     % but backslashes or quotes.
-    [string_start string_end] = regexp(s, '"[^"\\]*(?:\\.[^"\\]*)*"');
-    tokens = sparse(string_start, ones(1, length(string_start)), string_end);
+    strings = '"[^"\\]*(?:\\.[^"\\]*)*"';
+    punctuation = '[\s{}\[\]=:,]+';
+    keywords = '(true|false|null)';
+    numbers = '[-+0-9.eE]+';
+    everything = ['(' strings ')|(?>' punctuation ')|(?>' keywords ')|(' numbers ')'];
+    [start, stop] = regexp(s, everything);
+    tokens = sparse(start, ones(1, length(start)), stop);
 end
 
 % replace all backslash-escaped sequences in all strings
@@ -92,34 +98,47 @@ function s = unescape_strings(s)
     % This does not replace escaped quotes or escaped backslashes
     % since those mark beginnings and ends of JSON strings.
 
+    % The regex operations are *very* time-consuming for long strings
+    % and are only run if the string may contain an escaped sequence.
+    % Note that the s_has_token calls  only check for the existance of
+    % escaped characters (i.e. \n), but not for an escaped backslash,
+    % followed by a characters (i.e. \\n), but the regexes do.
+    % s_has_tokens takes milliseconds, where the regexes take seconds.
+
+    s_has_token = @(token)~isempty(strfind(s, token));
+
     % These regexes mean:
     % Find (an even number of `\`) followed by an escape sequence and
     % replace with the aforementioned `\` and a replacement.
 
-    % replace `\t` with tab, `\r` with return, `\n` with newline,
-    % `\f` with formfeed and `\b` with backspace.
-    s = regexprep(s, '((?<!\\)(?>\\\\)*)(\\[trnfb])', '$1${sprintf($2)}');
-    % replace `\/` with `/`
-    s = regexprep(s, '((?<!\\)(?>\\\\)*)\\/', '$1/');
-    % replace `\uXXXX` with the unicode character at codepoint XXXX
-    s = regexprep(s, '((?<!\\)(?>\\\\)*)\\u([0-9a-fA-F]{4})', '$1${char(hex2dec($2))}');
-end
-
-% searches for start and end points of numbers, and returns their indices
-function tokens = tokenize_numbers(s)
-    [string_start string_end] = regexp(s, '-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?');
-    tokens = sparse(string_start, ones(1, length(string_start)), string_end);
+    if cellfun(s_has_token, {'\t', '\r', '\n', '\f', '\b'})
+         % replace `\t` with tab, `\r` with return, `\n` with newline,
+         % `\f` with formfeed and `\b` with backspace.
+         s = regexprep(s, '((?<!\\)(?>\\\\)*)(\\[trnfb])', '$1${sprintf($2)}');
+    end
+    if s_has_token('\/')
+        % replace `\/` with `/`
+        s = regexprep(s, '((?<!\\)(?>\\\\)*)\\/', '$1/');
+    end
+    if s_has_token('\u')
+        % replace `\uXXXX` with the unicode character at codepoint XXXX
+        s = regexprep(s, '((?<!\\)(?>\\\\)*)\\u([0-9a-fA-F]{4})', '$1${char(hex2dec($2))}');
+    end
 end
 
 % parses a number and advances idx
-function [obj, idx] = number(json, idx, num_tokens)
-    stop = num_tokens(idx);
+function [obj, idx] = number(json, idx, tokens)
+    stop = tokens(idx);
     obj = str2num(json(idx:stop));
+    if isempty(obj)
+        error('JSON:parse:number:nonumber', ...
+              ['not a number: "' json(idx:stop) '" (char ' num2str(idx) ')']);
+    end
     idx = stop+1;
 end
 
 % parses an object and advances idx
-function [obj, idx] = object(json, idx, str_tokens, num_tokens)
+function [obj, idx] = object(json, idx, tokens)
     start = idx;
     obj = struct();
     if json(idx) ~= '{'
@@ -134,7 +153,7 @@ function [obj, idx] = object(json, idx, str_tokens, num_tokens)
                 error('JSON:parse:string:noquote', ...
                       ['string must start with " (char ' num2str(idx) ')']);
             end
-            [key, idx] = string(json, idx, str_tokens);
+            [key, idx] = string(json, idx, tokens);
             idx = next(json, idx);
             if json(idx) == ':'
                 idx = idx+1;
@@ -144,7 +163,7 @@ function [obj, idx] = object(json, idx, str_tokens, num_tokens)
                        '" (char ' num2str(idx) ')']);
             end
             idx = next(json, idx);
-            [val, idx] = value(json, idx, str_tokens, num_tokens);
+            [val, idx] = value(json, idx, tokens);
             obj.(genvarname(key)) = val; % make sure it's a valid name
             idx = next(json, idx);
             if json(idx) == ','
@@ -164,7 +183,7 @@ function [obj, idx] = object(json, idx, str_tokens, num_tokens)
 end
 
 % parses an array and advances idx
-function [obj, idx] = array(json, idx, str_tokens, num_tokens)
+function [obj, idx] = array(json, idx, tokens)
     start = idx;
     obj = {};
     if json(idx) ~= '['
@@ -175,7 +194,7 @@ function [obj, idx] = array(json, idx, str_tokens, num_tokens)
     idx = next(json, idx);
     if json(idx) ~= ']'
         while 1
-            [val, idx] = value(json, idx, str_tokens, num_tokens);
+            [val, idx] = value(json, idx, tokens);
             obj = [obj, {val}];
             idx = next(json, idx);
             if json(idx) == ','
