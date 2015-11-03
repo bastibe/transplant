@@ -41,7 +41,7 @@ end
 
 %% Object parsing
 s = parsejson('{"test": 1, "foo": "bar"}');
-if s.test ~= 1 || ~strcmp(s.foo, 'bar') || length(fieldnames(s)) ~= 2
+if s('test') ~= 1 || ~strcmp(s('foo'), 'bar') || length(keys(s)) ~= 2
     error('Object parsing failed')
 end
 

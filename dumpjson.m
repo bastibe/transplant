@@ -40,6 +40,10 @@ function [json] = value(data)
                 json = string(data);
             elseif iscell(data)
                 json = cell(data);
+            elseif isa(data, 'containers.Map')
+                % this must come before the next branch, since Maps
+                % are any((data) > 1) as well.
+                json = map(data);
             elseif any(size(data) > 1)
                 json = array(data);
             elseif isstruct(data)
@@ -52,6 +56,8 @@ function [json] = value(data)
                 else
                     error();
                 end
+            else
+                error();
             end
         end
     catch err
@@ -127,6 +133,20 @@ function [json] = cell(data)
         end
     end
     json = [json ']'];
+end
+
+% dumps a 0-dimensional container.Map as an object
+function [json] = map(data)
+    json = '{';
+    keys = data.keys();
+    for idx=1:length(keys)
+        key = keys{idx};
+        json = [json value(key) ':' value(data(key))];
+        if idx < length(keys)
+            json = [json ','];
+        end
+    end
+    json = [json '}'];
 end
 
 % dumps a 0-dimensional struct as an object

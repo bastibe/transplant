@@ -42,45 +42,45 @@ function transplant_remote(url)
 
         try
             msg = decode_values(receive_msg());
-            switch msg.type
+            switch msg('type')
                 case 'die' % exit matlab
                     send_ack();
                     quit;
                 case 'set_global' % save msg.value as a global variable
-                    assignin('base', msg.name, msg.value);
+                    assignin('base', msg('name'), msg('value'));
                     send_ack();
                 case 'get_global' % retrieve the value of a global variable
                     % simply evalin('base', msg.name) would call functions,
                     % so that can't be used.
-                    existance = evalin('base', ['exist(''' msg.name ''')']);
+                    existance = evalin('base', ['exist(''' msg('name') ''')']);
                     % value does not exist:
                     if existance == 0
                         error('TRANSPLANT:novariable' , ...
-                              ['Undefined variable ''' msg.name '''.']);
+                              ['Undefined variable ''' msg('name') '''.']);
                     % value is a function:
                     elseif any(existance == [2, 3, 5, 6])
-                        value = str2func(msg.name);
+                        value = str2func(msg('name'));
                     else
-                        value = evalin('base', msg.name);
+                        value = evalin('base', msg('name'));
                     end
                     send_value(value);
                 case 'set_proxy' % set field value of a cached object
-                    obj = proxied_objects{msg.handle};
-                    set(obj, msg.name, msg.value);
+                    obj = proxied_objects{msg('handle')};
+                    set(obj, msg.name, msg('value'));
                     send_ack();
                 case 'get_proxy' % retrieve field value of a cached object
-                    obj = proxied_objects{msg.handle};
-                    value = get(obj, msg.name);
+                    obj = proxied_objects{msg('handle')};
+                    value = get(obj, msg('name'));
                     send_value(value);
                 case 'del_proxy' % invalidate cached object
-                    proxied_objects{msg.handle} = [];
+                    proxied_objects{msg('handle')} = [];
                     send_ack();
                 case 'call' % call a function
-                    fun = str2func(msg.name);
+                    fun = str2func(msg('name'));
 
                     % get the number of output arguments
-                    if isfield(msg, 'nargout') && msg.nargout >= 0
-                        resultsize = msg.nargout;
+                    if isKey(msg, 'nargout') && msg('nargout') >= 0
+                        resultsize = msg('nargout');
                     else
                         resultsize = nargout(fun);
                     end
@@ -89,7 +89,8 @@ function transplant_remote(url)
                         % call the function with the given number of
                         % output arguments:
                         results = cell(resultsize, 1);
-                        [results{:}] = fun(msg.args{:});
+                        args = msg('args');
+                        [results{:}] = fun(args{:});
                         if length(results) == 1
                             send_value(results{1});
                         else
@@ -98,7 +99,8 @@ function transplant_remote(url)
                     else
                         % try to get output from ans:
                         clear('ans');
-                        fun(msg.args{:});
+                        args = msg('args');
+                        fun(args{:});
                         try
                             send_value(ans);
                         catch err
@@ -115,26 +117,28 @@ function transplant_remote(url)
     %
     % This is the base function for the specialized senders below
     function send_message(message_type, message)
-        message.type = message_type;
+        message('type') = message_type;
         messenger('send', dumpjson(message));
     end
 
     % Send an acknowledgement message
     function send_ack()
-        send_message('ack', struct());
+        send_message('ack', containers.Map());
     end
 
     % Send an error message
     function send_error(err)
-        message.identifier = err.identifier;
-        message.message = err.message;
-        message.stack = err.stack;
+        message = containers.Map();
+        message('identifier') = err.identifier;
+        message('message') = err.message;
+        message('stack') = err.stack;
         send_message('error', message);
     end
 
     % Send a message that contains a value
     function send_value(value)
-        message.value = encode_values(value);
+        message = containers.Map();
+        message('value') = encode_values(value);
         send_message('value', message);
     end
 
@@ -150,6 +154,14 @@ function transplant_remote(url)
         if (isnumeric(value) && numel(value) ~= 0 && ...
             (numel(value) > 1 || ~isreal(value)))
             value = encode_matrix(value);
+        elseif isa(value, 'containers.Map')
+            % containers.Map is a handle object, so we need to create a
+            % new copy her in order to not change the original object.
+            out = containers.Map();
+            for key=value.keys()
+                out(key{1}) = encode_values(value(key{1}));
+            end
+            value = out;
         elseif isobject(value)
             value = encode_object(value);
         elseif isa(value, 'function_handle')
@@ -185,6 +197,10 @@ function transplant_remote(url)
                 for idx=1:numel(value)
                     value{idx} = decode_values(value{idx});
                 end
+            end
+        elseif isa(value, 'containers.Map')
+            for key=value.keys()
+                value(key{1}) = decode_values(value(key{1}));
             end
         elseif isstruct(value)
             keys = fieldnames(value);

@@ -7,7 +7,7 @@
 %    - true, false are converted to logical 1, 0
 %    - null is converted to []
 %    - arrays are converted to cell arrays
-%    - objects are converted to structs
+%    - objects are converted to containers.Map
 %
 %    In contrast to many other JSON parsers, this one does not try to
 %    convert all-numeric arrays into matrices. Thus, nested data
@@ -140,7 +140,7 @@ end
 % parses an object and advances idx
 function [obj, idx] = object(json, idx, tokens)
     start = idx;
-    obj = struct();
+    obj = containers.Map();
     if json(idx) ~= '{'
         error('JSON:parse:object:nobrace', ...
               ['object must start with "{" (char ' num2str(idx) ')']);
@@ -164,7 +164,7 @@ function [obj, idx] = object(json, idx, tokens)
             end
             idx = next(json, idx);
             [val, idx] = value(json, idx, tokens);
-            obj.(genvarname(key)) = val; % make sure it's a valid name
+            obj(key) = val;
             idx = next(json, idx);
             if json(idx) == ','
                 idx = idx+1;

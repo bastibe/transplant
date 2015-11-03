@@ -45,7 +45,9 @@ if ~(strcmp('{"test":1,"foo":"bar"}', s) || ...
 end
 
 %% Data roundtrip
-data = {struct('test', 1), true, [], 'über'};
+% Note that UniformValues must be false, since Matlab assumes double otherwise
+% and parsejson can't make the same inference at parse time.
+data = {containers.Map('test', 1, 'UniformValues', false), true, [], 'über'};
 if ~isequal(data, parsejson(dumpjson(data)))
     error('Data roundtrip failed')
 end
