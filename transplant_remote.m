@@ -31,12 +31,25 @@
 
 % (c) 2014 Bastian Bechtold
 
-function transplant_remote(url)
+function transplant_remote(url, is_zombie)
+    % this must be persistent to survive a SIGINT:
+    persistent proxied_objects
+    if nargin == 1
+        % normal startup
+        messenger('open', url); % start 0MQ
+        proxied_objects = {};
+    elseif nargin > 1 && is_zombie
+        % SIGINT has killed transplant_remote, but onCleanup has revived it
+        % At this point, neither lasterror nor MException.last is available,
+        % so we don't actually know where we were killed.
+        send_ack();
+    else
+        % no idea what happened. I don't want to live any more.
+        exit();
+    end
 
-    % start 0MQ:
-    messenger('open', url)
-
-    proxied_objects = {};
+    % make sure that transplant doesn't crash on SIGINT
+    zombie = onCleanup(@()transplant_remote(url, true));
 
     while 1 % main messaging loop
 

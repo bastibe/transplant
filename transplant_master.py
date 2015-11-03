@@ -1,4 +1,5 @@
 from subprocess import Popen, DEVNULL, PIPE
+from signal import SIGINT
 import re
 import tempfile
 import zmq
@@ -332,8 +333,18 @@ class Matlab(TransplantMaster):
     def _call(self, name, args, nargout=-1):
         """Call a function on the remote."""
         args = list(args)
-        response = self.send_message('call', name=name, args=args,
-                                     nargout=nargout)
+        try:
+            response = self.send_message('call', name=name, args=args,
+                                         nargout=nargout)
+        except BaseException as exc:
+            # BaseException catches *both* Exception and KeyboardInterrupt
+            # hand the interrupt down to Matlab:
+            self.process.send_signal(SIGINT)
+            # receive outstanding message to get ZMQ back in the right state
+            response = self.socket.recv_json()
+            # continue with the exception
+            raise exc
+
         if response['type'] == 'value':
             return response['value']
 
