@@ -202,7 +202,7 @@ function [obj, idx] = true(json, idx)
               ['not enough data for "true" in "' json(start:end) ...
                '" (char ' num2str(start) ')']);
     end
-    if json(idx:idx+3) == 'true'
+    if strcmp(json(idx:idx+3), 'true')
         obj = logical(1);
         idx = idx+4;
     else
@@ -220,7 +220,7 @@ function [obj, idx] = false(json, idx)
               ['not enough data for "false" in "' json(start:end) ...
                '" (char ' num2str(start) ')']);
     end
-    if json(idx:idx+4) == 'false'
+    if strcmp(json(idx:idx+4), 'false')
         obj = logical(0);
         idx = idx+5;
     else
@@ -238,7 +238,7 @@ function [obj, idx] = null(json, idx)
               ['not enough data for "null" in "' json(start:end) ...
                '" (char ' num2str(start) ')']);
     end
-    if json(idx:idx+3) == 'null'
+    if strcmp(json(idx:idx+3), 'null')
         obj = [];
         idx = idx+4;
     else
