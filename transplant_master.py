@@ -297,8 +297,9 @@ class Matlab(TransplantMaster):
     def __init__(self, executable='matlab', arguments=('-nodesktop', '-nosplash'), address=None, user=None):
         """Starts a Matlab instance and opens a communication channel."""
         if address is None:
-            self.ipcfile = tempfile.NamedTemporaryFile()
-            zmq_address = 'ipc://' + self.ipcfile.name
+            # generate a valid and unique local pathname
+            with tempfile.NamedTemporaryFile() as f:
+                zmq_address = 'ipc://' + f.name
             process_arguments = ([executable] + list(arguments) +
                                  ['-r', 'transplant_remote {}'.format(zmq_address)])
         else:
