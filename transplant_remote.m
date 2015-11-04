@@ -34,15 +34,20 @@
 function transplant_remote(url, is_zombie)
     % this must be persistent to survive a SIGINT:
     persistent proxied_objects
+    persistent is_receiving
     if nargin == 1
         % normal startup
         messenger('open', url); % start 0MQ
         proxied_objects = {};
-    elseif nargin > 1 && is_zombie
+    elseif nargin > 1 && is_zombie && ~is_receiving
         % SIGINT has killed transplant_remote, but onCleanup has revived it
         % At this point, neither lasterror nor MException.last is available,
         % so we don't actually know where we were killed.
         send_ack();
+    elseif nargin > 1 && is_zombie && is_receiving
+        % Sometimes, functions return normally, then trow a delayed error after
+        % they return. In that case, we crash within receive_msg. To recover,
+        % just continue receiving as if nothing had happened.
     else
         % no idea what happened. I don't want to live any more.
         exit();
@@ -54,7 +59,10 @@ function transplant_remote(url, is_zombie)
     while 1 % main messaging loop
 
         try
-            msg = decode_values(receive_msg());
+            is_receiving = true;
+            msg = receive_msg();
+            is_receiving = false;
+            msg = decode_values(msg);
             switch msg('type')
                 case 'die' % exit matlab
                     send_ack();

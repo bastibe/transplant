@@ -336,8 +336,7 @@ class Matlab(TransplantMaster):
         try:
             response = self.send_message('call', name=name, args=args,
                                          nargout=nargout)
-        except BaseException as exc:
-            # BaseException catches *both* Exception and KeyboardInterrupt
+        except KeyboardInterrupt as exc:
             # hand the interrupt down to Matlab:
             self.process.send_signal(SIGINT)
             # receive outstanding message to get ZMQ back in the right state
