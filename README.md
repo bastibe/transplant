@@ -24,7 +24,7 @@ STARTING MATLAB
 ----------------
 
 ```python
-matlab = transplant_master.Matlab()
+matlab = transplant.Matlab()
 ```
 
 Will start a Matlab session and connect to it. This will take a few
@@ -72,7 +72,7 @@ Input arguments are converted to Matlab data structures:
 - `True` and `False` become `logical(1)` and `logical(0)`
 - `None` becomes `[]`
 - Lists become cell arrays
-- Dictionaries become structs
+- Dictionaries become `containers.Map`
 - Numpy arrays become matrices
 
 If the function returns a function handle or an object, a matching
@@ -111,6 +111,11 @@ therefore not work as expected. For example, `matlab.truth = 42`,
 `matlab.exist('truth')` will not find the `truth` variable. Use
 `matlab.evalin('base', "exist('truth')", nargout=1)` instead in this
 case.
+
+If you hit Ctrl-C, the `KeyboardInterrupt` will be applied to both
+Python and Matlab, stopping any currently running function. Due to a
+limitation of Matlab, the error and stack trace of that function will
+be lost.
 
 HOW DOES IT WORK?
 -----------------
@@ -155,12 +160,6 @@ Matlab.
 
 Note that this project includes a JSON serializer/parser and a Base64
 encoder/decoder in pure Matlab.
-
-TODO
-----
-
-- Implement _transplant_ servers in Julia and PyPy.
-- Implement _transplant_ clients in Python, Julia, PyPy and Matlab.
 
 INSTALLATION
 ------------
