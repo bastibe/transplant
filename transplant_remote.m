@@ -152,7 +152,14 @@ function transplant_remote(url, is_zombie)
         message = containers.Map();
         message('identifier') = err.identifier;
         message('message') = err.message;
-        message('stack') = err.stack;
+        % ignore stack frames from the last restart
+        is_cleanup = @(s)~isempty(strfind(s.name, 'onCleanup.delete'));
+        cleanup_idx = find(arrayfun(is_cleanup, err.stack), 1);
+        if ~isempty(cleanup_idx)
+            message('stack') = err.stack([1:cleanup_idx-2]);
+        else
+            message('stack') = err.stack;
+        end
         send_message('error', message);
     end
 
