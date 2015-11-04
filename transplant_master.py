@@ -127,7 +127,7 @@ class TransplantMaster:
     def __del__(self):
         """Close the connection, and kill the process."""
         self.send_message('die')
-        self.process.terminate()
+        self.process.wait()
 
     def send_message(self, msg_type, **kwargs):
         """Send a message and return the response"""

@@ -117,6 +117,26 @@ Python and Matlab, stopping any currently running function. Due to a
 limitation of Matlab, the error and stack trace of that function will
 be lost.
 
+STOPPING MATLAB
+---------------
+
+When working with Transplant, you will notice that sometimes, Matlab
+processes don't die when you expect them to die. If you are running
+the regular `python` interpreter, chances are that the Matlab process
+is still referenced in `sys.last_traceback`, which holds the value of
+the last exception that was raised. Your Matlab process will die once
+the next exception is raised.
+
+If you are running `ipython`, though, all bets are off. I have noticed
+that `ipython` keeps all kinds of references to all kinds of things.
+Sometimes, `%reset` will clear them, sometimes it won't. Sometimes
+they only go away when `ipython` quits. This can be quite annoying.
+
+In some circumstances, the Matlab process even survives the calling
+Python session. I have no idea how that is even possible. If you can
+find a reproducable way of triggering this event, I would be very
+grateful if you shared if with me.
+
 HOW DOES IT WORK?
 -----------------
 

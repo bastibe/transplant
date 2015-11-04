@@ -33,24 +33,30 @@
 
 function transplant_remote(url, is_zombie)
     % this must be persistent to survive a SIGINT:
-    persistent proxied_objects
-    persistent is_receiving
-    if nargin == 1
-        % normal startup
-        messenger('open', url); % start 0MQ
-        proxied_objects = {};
-    elseif nargin > 1 && is_zombie && ~is_receiving
-        % SIGINT has killed transplant_remote, but onCleanup has revived it
-        % At this point, neither lasterror nor MException.last is available,
-        % so we don't actually know where we were killed.
-        send_ack();
-    elseif nargin > 1 && is_zombie && is_receiving
-        % Sometimes, functions return normally, then trow a delayed error after
-        % they return. In that case, we crash within receive_msg. To recover,
-        % just continue receiving as if nothing had happened.
-    else
-        % no idea what happened. I don't want to live any more.
-        exit();
+    persistent proxied_objects is_receiving
+    % during restarts after a call to exit, normally safe things break,
+    % so just ignore them and continue exiting.
+    try
+        if nargin == 1
+            % normal startup
+            messenger('open', url); % start 0MQ
+            proxied_objects = {};
+            is_receiving = false;
+        elseif nargin > 1 && is_zombie && ~is_receiving
+            % SIGINT has killed transplant_remote, but onCleanup has revived it
+            % At this point, neither lasterror nor MException.last is available,
+            % so we don't actually know where we were killed.
+            send_ack();
+        elseif nargin > 1 && is_zombie && is_receiving
+            % Sometimes, functions return normally, then trow a delayed error after
+            % they return. In that case, we crash within receive_msg. To recover,
+            % just continue receiving as if nothing had happened.
+        else
+            % no idea what happened. I don't want to live any more.
+            return
+        end
+    catch
+        return
     end
 
     % make sure that transplant doesn't crash on SIGINT
@@ -66,7 +72,7 @@ function transplant_remote(url, is_zombie)
             switch msg('type')
                 case 'die' % exit matlab
                     send_ack();
-                    quit;
+                    quit('force');
                 case 'set_global' % save msg.value as a global variable
                     assignin('base', msg('name'), msg('value'));
                     send_ack();
