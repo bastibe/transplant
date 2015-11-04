@@ -124,10 +124,20 @@ class TransplantMaster:
                 print(line.decode(), end='')
         Thread(target=reader, daemon=True).start()
 
-    def __del__(self):
+    def __enter__(self):
+        return self
+
+    def __exit__(self):
+        self.close()
+
+    def close(self):
         """Close the connection, and kill the process."""
         self.send_message('die')
         self.process.wait()
+
+    def __del__(self):
+        """Close the connection, and kill the process."""
+        self.close()
 
     def send_message(self, msg_type, **kwargs):
         """Send a message and return the response"""

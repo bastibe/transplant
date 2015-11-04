@@ -120,22 +120,26 @@ be lost.
 STOPPING MATLAB
 ---------------
 
-When working with Transplant, you will notice that sometimes, Matlab
-processes don't die when you expect them to die. If you are running
-the regular `python` interpreter, chances are that the Matlab process
-is still referenced in `sys.last_traceback`, which holds the value of
-the last exception that was raised. Your Matlab process will die once
-the next exception is raised.
+Matlab processes end when the `Matlab` instance goes out of scope or
+is explicitly closed using the `close` method. Alternatively, the
+`Matlab` class can be used as a context manager, which will properly
+clean up after itself.
+
+If you are not using the context manager or the `close` method, you
+will notice that some Matlab processes don't die when you expect them
+to die. If you are running the regular `python` interpreter, chances
+are that the Matlab process is still referenced to in
+`sys.last_traceback`, which holds the value of the last exception that
+was raised. Your Matlab process will die once the next exception is
+raised.
 
 If you are running `ipython`, though, all bets are off. I have noticed
 that `ipython` keeps all kinds of references to all kinds of things.
 Sometimes, `%reset` will clear them, sometimes it won't. Sometimes
-they only go away when `ipython` quits. This can be quite annoying.
-
-In some circumstances, the Matlab process even survives the calling
-Python session. I have no idea how that is even possible. If you can
-find a reproducable way of triggering this event, I would be very
-grateful if you shared if with me.
+they only go away when `ipython` quits. And sometimes, even stopping
+`ipython` doesn't kill it (how is this even possible?). This can be
+quite annoying. Use the `close` method or the context manager to make
+sure the processes are stopped correctly.
 
 HOW DOES IT WORK?
 -----------------
