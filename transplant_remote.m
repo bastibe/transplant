@@ -276,14 +276,10 @@ function [value] = encode_matrix(value)
     if ~isreal(value) && isinteger(value)
         value = double(value); % Numpy does not know complex int
     end
-    % convert to uint8 1-D array in row-major order
-    if length(size(value)) > 2
-        row_major_order = [2, 1, 3:length(size(value))];
-    else
-        row_major_order = [2, 1];
-    end
+    % convert column-major (Matlab, FORTRAN) to row-major (C, Python)
+    value = permute(value, length(size(value)):-1:1);
+    % convert to uint8 1-D array
     if isreal(value)
-        value = permute(value, row_major_order);
         binary = typecast(value(:), 'uint8');
     else
         % convert [complex, complex] into [real, imag, real, imag]
@@ -291,14 +287,12 @@ function [value] = encode_matrix(value)
         if isa(value, 'single')
             tmp = single(tmp);
         end
-        value = permute(value, row_major_order);
         tmp(1:2:end) = real(value(:));
         tmp(2:2:end) = imag(value(:));
         binary = typecast(tmp, 'uint8');
     end
     if islogical(value)
         % convert logicals (bool) into one-byte-per-bit
-        value = permute(value, row_major_order);
         binary = cast(value,'uint8');
     end
     base64 = base64encode(binary);
@@ -352,12 +346,7 @@ function [value] = decode_matrix(value)
     else
         value = typecast(binary, dtype);
     end
-    % convert row-major (C, Python) to whatever the hell Matlab thinks
-    % is a proper order of things.
+    % convert row-major (C, Python) to column-major (Matlab, FORTRAN)
     value = reshape(value, fliplr(shape));
-    if length(shape) > 2
-        value = permute(value, [2 1 3:length(shape)]);
-    else
-        value = permute(value, [2 1]);
-    end
+    value = permute(value, length(shape):-1:1);
 end

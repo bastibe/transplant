@@ -117,6 +117,43 @@ Python and Matlab, stopping any currently running function. Due to a
 limitation of Matlab, the error and stack trace of that function will
 be lost.
 
+MATRIX DIMENSIONS
+-----------------
+
+The way multidimensional arrays are indexed in Matlab and Python are
+fundamentally different. Thankfully, the two-dimensional case works as
+expected:
+
+               Python         |        Matlab
+    --------------------------+------------------------
+     array([[  1,   2,   3],  |     1   2   3
+            [ 10,  20,  30]]) |    10  20  30
+
+In both languages, this array has the shape `(2, 3)`.
+
+With higher-dimension arrays, this becomes harder. The next array is
+again identical:
+
+               Python         |        Matlab
+    --------------------------+------------------------
+     array([[[  1,   2],      | (:,:,1) =
+             [  3,   4]],     |              1    3
+                              |             10   30
+            [[ 10,  20],      |            100  300
+             [ 30,  40]],     | (:,:,2) =
+                              |              2    4
+            [[100, 200],      |             20   40
+             [300, 400]]])    |            200  400
+
+Even though they look radically different, they both have the same
+shape `(3, 2, 2)`, and are indexed in the same way. The element at
+position `a, b, c` in Python is the same as the element at position
+`a+1, b+1, c+1` in Matlab (`+1` due to zero-based/one-based indexing).
+
+You can think about the difference in presentation like this: Python
+displays multidimensional arrays as `[n,:,:]`, whereas Matlab displays
+them as `(:,:,n)`.
+
 STOPPING MATLAB
 ---------------
 
