@@ -185,7 +185,9 @@ function transplant_remote(url, is_zombie)
     % recursively step through value and encode all occurrences of
     % matrices, objects and functions as special cell arrays.
     function [value] = encode_values(value)
-        if (isnumeric(value) && numel(value) ~= 0 && ...
+        if issparse(value)
+            value = encode_sparse_matrix(value);
+        elseif (isnumeric(value) && numel(value) ~= 0 && ...
             (numel(value) > 1 || ~isreal(value)))
             value = encode_matrix(value);
         elseif isa(value, 'containers.Map')
@@ -223,6 +225,8 @@ function transplant_remote(url, is_zombie)
             special = len > 0 && ischar(value{1});
             if special && len == 4 && strcmp(value{1}, '__matrix__')
                 value = decode_matrix(value);
+            elseif special && len == 5 && strcmp(value{1}, '__sparse__')
+                value = decode_sparse_matrix(value);
             elseif special && len == 2 && strcmp(value{1}, '__object__')
                 value = proxied_objects{value{2}};
             elseif special && len == 2 && strcmp(value{1}, '__function__')
@@ -293,9 +297,10 @@ function [value] = encode_matrix(value)
     end
     if islogical(value)
         % convert logicals (bool) into one-byte-per-bit
-        binary = cast(value,'uint8');
+        binary = cast(value, 'uint8');
     end
-    base64 = base64encode(binary);
+    % not all typecasts return column vectors, so use (:)
+    base64 = base64encode(binary(:));
     % translate Matlab class names into numpy dtypes
     if isa(value, 'double') && isreal(value)
         dtype = 'float64';
@@ -349,4 +354,45 @@ function [value] = decode_matrix(value)
     % convert row-major (C, Python) to column-major (Matlab, FORTRAN)
     value = reshape(value, fliplr(shape));
     value = permute(value, length(shape):-1:1);
+end
+
+% Encode a sparse matrix as a special list.
+% A sparse matrix `[[2, 0], [0, 3]]` would be encoded as
+% `["__sparse__", [2, 2],
+%   <matrix for row indices [0, 1]>,
+%   <matrix for row indices [1, 0]>,
+%   <matrix for values [2, 3]>]`,
+% where each `<matrix>` is encoded according `encode_matrix` and `[2,
+% 2]` is the data shape.
+function [value] = encode_sparse_matrix(value)
+    [row, col, data] = find(value);
+    if numel(data) > 0
+        value = {'__sparse__', fliplr(size(value)), ...
+                 encode_matrix(row-1), encode_matrix(col-1), ...
+                 encode_matrix(data)};
+    else
+        % don't try to encode empty matrices as matrices
+        value = {'__sparse__', fliplr(size(value)), [], [], []};
+    end
+end
+
+% Decode a special list to a sparse matrix.
+% A sparse matrix
+% `["__sparse__", [2, 2],
+%   <matrix for row indices [0, 1]>,
+%   <matrix for row indices [1, 0]>,
+%   <matrix for values [2, 3]>]`,
+% where each `<matrix>` is encoded according `encode_matrix` would be
+% decoded as `[[2, 0], [0, 3]]`.
+function [value] = decode_sparse_matrix(value)
+    shape = cell2mat(value{2});
+    if length(shape) == 0
+        shape = [1 1];
+    elseif length(shape) == 1
+        shape = [1 shape];
+    end
+    row = double(decode_matrix(value{3}));
+    col = double(decode_matrix(value{4}));
+    data = double(decode_matrix(value{5}));
+    value = sparse(row+1, col+1, data, shape(1), shape(2));
 end

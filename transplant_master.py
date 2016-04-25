@@ -6,6 +6,13 @@ import zmq
 import numpy as np
 import base64
 from threading import Thread
+try:
+    from scipy.sparse import spmatrix as sparse_matrix
+except ImportError:
+    # this will fool the `isinstance(data, sparse_matrix)` in
+    # `_encode_values` to never trigger in case scipy.sparse is not
+    # installed:
+    sparse_matrix = tuple()
 
 
 """Transplant is a Python client for remote code execution
@@ -165,6 +172,10 @@ class TransplantMaster:
         elif isinstance(data, complex):
             # encode python complex numbers as scalar numpy arrays
             return self._encode_matrix(np.complex128(data))
+        elif isinstance(data, sparse_matrix):
+            # sparse_matrix will be an empty tuple if scipy.sparse is
+            # not installed.
+            return self._encode_sparse_matrix(data)
         elif isinstance(data, self.ProxyObject):
             return self._encode_proxy(data)
         elif isinstance(data, dict):
@@ -185,6 +196,10 @@ class TransplantMaster:
             len(data) == 4 and
             data[0] == "__matrix__"):
             return self._decode_matrix(data)
+        elif (isinstance(data, list) and
+            len(data) == 5 and
+            data[0] == "__sparse__"):
+            return self._decode_sparse_matrix(data)
         elif (isinstance(data, list) and
             len(data) == 2 and
             data[0] == "__object__"):
@@ -237,6 +252,44 @@ class TransplantMaster:
         dtype, shape, data = data[1:]
         out = np.fromstring(base64.b64decode(data.encode()), dtype)
         return out.reshape(*shape)
+
+    def _encode_sparse_matrix(self, data):
+        """Encode a scipy.sparse matrix as a special list.
+
+        A sparse matrix `[[2, 0], [0, 3]]` would be encoded as
+        `["__sparse__", [2, 2],
+          <matrix for row indices [0, 1]>,
+          <matrix for row indices [1, 0]>,
+          <matrix for values [2, 3]>]`,
+        where each `<matrix>` is encoded according to `_encode_matrix`
+        and `[2, 2]` is the data shape.
+        """
+
+        # import scipy here to avoid a global import
+        import scipy.sparse
+        return ["__sparse__", data.shape] + \
+            [self._encode_matrix(d) for d in scipy.sparse.find(data)]
+
+    def _decode_sparse_matrix(self, data):
+        """Decode a special list to a scipy.sparse matrix.
+
+        A sparse matrix
+        `["__sparse__", [2, 2],
+          <matrix for row indices [0, 1]>,
+          <matrix for row indices [1, 0]>,
+          <matrix for values [2, 3]>]`,
+        where each `matrix` is encoded according to `_encode_matrix`,
+        would be decoded as `[[2, 0], [0, 3]]`.
+        """
+
+        # import scipy here to avoid a global import
+        import scipy.sparse
+        # either decode as vector, or as [], since coo_matrix doesn't
+        # know what to do with 2D-arrays or None.
+        row, col, value = (self._decode_matrix(d).ravel()
+                           if d is not None else []
+                           for d in data[2:])
+        return scipy.sparse.coo_matrix((value, (row, col)), shape=data[1])
 
     def _encode_proxy(self, data):
         """Encode a ProxyObject as a special list.

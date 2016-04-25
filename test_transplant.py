@@ -1,6 +1,7 @@
 from transplant import Matlab, TransplantError
 import numpy as np
 import pytest
+import warnings
 
 test_data = np.array([[1, 2, 3],
                       [4, 5, 6]])
@@ -72,3 +73,28 @@ def test_matrices(matlab):
         m = matlab.evalin('base', evalstr, nargout=1)
         b = transferred_back[a, b, c, d]
         assert p == m == b
+
+def test_sparse_matrices(matlab):
+    # construct a sparse matrix with ten random numbers at random places:
+    import scipy.sparse
+    matrix = np.zeros([10, 10])
+    random_x = np.random.randint(10, size=10)
+    random_y = np.random.randint(10, size=10)
+    matrix[random_x, random_y] = np.random.randn(10)
+    # convert to sparse and transfer to matlab:
+    sparse = scipy.sparse.csc_matrix(matrix)
+    matlab.test = sparse
+
+    for x, y in zip(range(matrix.shape[0]), range(matrix.shape[1])):
+        m = matlab.evalin('base', 'test({}, {})'.format(x+1, y+1), nargout=1)
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=scipy.sparse.SparseEfficiencyWarning)
+            assert matrix[x, y] == sparse[x, y] == m
+
+def test_empty_sparse_matrices(matlab):
+    import scipy.sparse
+    matrix = np.zeros([2, 2])
+    # send an empty sparse matrix to matlab
+    assert matlab.issparse(scipy.sparse.csc_matrix(matrix))
+    # get an empty sparse matrix from matlab
+    assert isinstance(matlab.sparse(2, 2), scipy.sparse.spmatrix)
