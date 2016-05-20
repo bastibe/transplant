@@ -6,6 +6,7 @@ import zmq
 import numpy as np
 import base64
 from threading import Thread
+import msgpack
 try:
     from scipy.sparse import spmatrix as sparse_matrix
 except ImportError:
@@ -109,7 +110,7 @@ class TransplantMaster:
 
     def __setattr__(self, name, value):
         """Retrieve a value or function from the remote."""
-        if name in ['ipcfile', 'context', 'socket', 'process']:
+        if name in ['ipcfile', 'context', 'socket', 'process', 'msgformat']:
             self.__dict__[name] = value
         else:
             self._set_global(name, value)
@@ -149,8 +150,12 @@ class TransplantMaster:
     def send_message(self, msg_type, **kwargs):
         """Send a message and return the response"""
         kwargs = self._encode_values(kwargs)
-        self.socket.send_json(dict(kwargs, type=msg_type))
-        response = self.socket.recv_json()
+        if self.msgformat == 'msgpack':
+            self.socket.send(msgpack.dumps(dict(kwargs, type=msg_type)))
+            response = msgpack.loads(self.socket.recv(), encoding='utf-8')
+        else:
+            self.socket.send_json(dict(kwargs, type=msg_type))
+            response = self.socket.recv_json()
         response = self._decode_values(response)
         if response['type'] == 'error':
             # Create a pretty backtrace almost like Python's:
@@ -361,14 +366,16 @@ class Matlab(TransplantMaster):
 
     ProxyObject = MatlabProxyObject
 
-    def __init__(self, executable='matlab', arguments=('-nodesktop', '-nosplash'), address=None, user=None):
+    def __init__(self, executable='matlab', arguments=('-nodesktop', '-nosplash'), msgformat='msgpack', address=None, user=None):
         """Starts a Matlab instance and opens a communication channel."""
+        if msgformat not in ['msgpack', 'json']:
+            raise ValueError('msgformat must be "msgpack" or "json"')
         if address is None:
             # generate a valid and unique local pathname
             with tempfile.NamedTemporaryFile() as f:
                 zmq_address = 'ipc://' + f.name
             process_arguments = ([executable] + list(arguments) +
-                                 ['-r', 'transplant_remote {}'.format(zmq_address)])
+                                 ['-r', 'transplant_remote {} {}'.format(msgformat, zmq_address)])
         else:
             # get local IP address
             from socket import create_connection
@@ -381,7 +388,8 @@ class Matlab(TransplantMaster):
             if user is not None:
                 address = '{}@{}'.format(user, address)
             process_arguments = (['ssh', address, executable, '-wait'] + list(arguments) +
-                                 ['-r', '"transplant_remote {}"'.format(zmq_address)])
+                                 ['-r', '"transplant_remote {} {}"'.format(msgformat, zmq_address)])
+        self.msgformat = msgformat
         self.context = zmq.Context.instance()
         self.socket = self.context.socket(zmq.REQ)
         self.socket.bind(zmq_address)
@@ -403,7 +411,10 @@ class Matlab(TransplantMaster):
             # hand the interrupt down to Matlab:
             self.process.send_signal(SIGINT)
             # receive outstanding message to get ZMQ back in the right state
-            response = self.socket.recv_json()
+            if self.msgformat == 'msgpack':
+                response = msgpack.loads(self.socket.recv(), encoding='utf-8')
+            else:
+                response = self.socket.recv_json()
             # continue with the exception
             raise exc
 
@@ -415,5 +426,5 @@ class Matlab(TransplantMaster):
 
         def call_matlab(*args, nargout=-1):
             return self._call(data[1], args, nargout=nargout)
-        call_matlab.__doc__, _ = self._call('help', [data[1]])
+        call_matlab.__doc__ = self._call('help', [data[1]], nargout=1)
         return call_matlab

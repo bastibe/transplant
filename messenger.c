@@ -13,15 +13,30 @@
 void *ctx = NULL;
 void *sock = NULL;
 
+typedef enum {BINARY, STRING} msgformats;
+
+msgformats msgformat = BINARY;
+
 /* Create the socket and start 0MQ */
 void open(int nlhs, mxArray *plhs[],
           int nrhs, const mxArray *prhs[]) {
 
-    if (nrhs != 2) {
-        mexErrMsgTxt("Missing argument: socket address");
+    if (nrhs != 3) {
+        mexErrMsgTxt("Missing argument: msgformat and socket address");
     }
 
-    char *sock_addr = mxArrayToString(prhs[1]);
+    char *format_str = mxArrayToString(prhs[1]);
+    char *sock_addr = mxArrayToString(prhs[2]);
+
+    if (!format_str) {
+        mexErrMsgTxt("Cannot read message format");
+    }
+
+    if (strcmp(format_str, "msgpack") == 0) {
+        msgformat = BINARY;
+    } else {
+        msgformat = STRING;
+    }
 
     if (!sock_addr) {
         mexErrMsgTxt("Cannot read socket address");
@@ -128,9 +143,15 @@ void receive(int nlhs, mxArray *plhs[],
         }
     }
 
-    char *data = (char*)mxCalloc(msglen+1, 1); /* one more NUL as terminator */
-    memcpy((void*)data, zmq_msg_data(&msg), msglen);
-    plhs[0] = mxCreateString(data);
+    if (msgformat == STRING) {
+        char *data = (char*)mxCalloc(msglen+1, 1); /* one more NUL as terminator */
+        memcpy((void*)data, zmq_msg_data(&msg), msglen);
+        plhs[0] = mxCreateString(data);
+    } else {
+        plhs[0] = mxCreateNumericMatrix(1, msglen, mxUINT8_CLASS, mxREAL);
+        void *data = mxGetData(plhs[0]);
+        memcpy((void*)data, zmq_msg_data(&msg), msglen);
+    }
     err = zmq_msg_close(&msg);
     if (err) {
         switch (errno) {
@@ -151,8 +172,12 @@ void send(int nlhs, mxArray *plhs[],
     }
 
     size_t msglen = mxGetNumberOfElements(prhs[1]);
-    char *msg_out = mxArrayToString(prhs[1]);
-
+    char *msg_out;
+    if (msgformat == STRING) {
+        msg_out = mxArrayToString(prhs[1]);
+    } else {
+        msg_out = (char*)mxGetData(prhs[1]);
+    }
     size_t sentlen = zmq_send(sock, msg_out, msglen, 0);
 
     if (msglen != sentlen) {
@@ -224,7 +249,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
                  int nrhs, const mxArray *prhs[]) {
 
     if (nrhs == 0) {
-        mexErrMsgTxt("Usage: messenger('open', 'url')\n"
+        mexErrMsgTxt("Usage: messenger('open', 'msgformat', 'url')\n"
                      "       messenger('receive')\n"
                      "       messenger('send', 'content')\n"
                      "       messenger('close')");

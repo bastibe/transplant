@@ -31,23 +31,23 @@
 
 % (c) 2014 Bastian Bechtold
 
-function transplant_remote(url, is_zombie)
+function transplant_remote(msgformat, url, is_zombie)
     % this must be persistent to survive a SIGINT:
     persistent proxied_objects is_receiving
     % during restarts after a call to exit, normally safe things break,
     % so just ignore them and continue exiting.
     try
-        if nargin == 1
+        if nargin == 2
             % normal startup
-            messenger('open', url); % start 0MQ
+            messenger('open', msgformat, url); % start 0MQ
             proxied_objects = {};
             is_receiving = false;
-        elseif nargin > 1 && is_zombie && ~is_receiving
+        elseif nargin > 2 && is_zombie && ~is_receiving
             % SIGINT has killed transplant_remote, but onCleanup has revived it
             % At this point, neither lasterror nor MException.last is available,
             % so we don't actually know where we were killed.
             send_ack();
-        elseif nargin > 1 && is_zombie && is_receiving
+        elseif nargin > 2 && is_zombie && is_receiving
             % Sometimes, functions return normally, then trow a delayed error after
             % they return. In that case, we crash within receive_msg. To recover,
             % just continue receiving as if nothing had happened.
@@ -60,7 +60,7 @@ function transplant_remote(url, is_zombie)
     end
 
     % make sure that transplant doesn't crash on SIGINT
-    zombie = onCleanup(@()transplant_remote(url, true));
+    zombie = onCleanup(@()transplant_remote(url, msgformat, true));
 
     while 1 % main messaging loop
 
@@ -145,7 +145,11 @@ function transplant_remote(url, is_zombie)
     % This is the base function for the specialized senders below
     function send_message(message_type, message)
         message('type') = message_type;
-        messenger('send', dumpjson(message));
+        if strcmp(msgformat, 'msgpack')
+            messenger('send', dumpmsgpack(message));
+        else
+            messenger('send', dumpjson(message));
+        end
     end
 
     % Send an acknowledgement message
@@ -179,7 +183,11 @@ function transplant_remote(url, is_zombie)
     % Wait for and receive a message
     function message = receive_msg()
         blob = messenger('receive');
-        message = decode_values(parsejson(blob));
+        if strcmp(msgformat, 'msgpack')
+            message = decode_values(parsemsgpack(blob));
+        else
+            message = decode_values(parsejson(blob));
+        end
     end
 
     % recursively step through value and encode all occurrences of
