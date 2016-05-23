@@ -186,10 +186,12 @@ connects to it via [0MQ](http://zeromq.org/) in a request-response
 pattern. Matlab then runs the _transplant_ remote and starts listening
 for messages. Now, Python can send messages to Matlab, and Matlab will
 respond. Roundtrip time for sending/receiving and encoding/decoding
-values from Python to Matlab and back is about 20 ms.
+values from Python to Matlab and back is about 3-7 ms.
 
-All messages are JSON-encoded objects. There are seven messages types
-used by Python:
+All messages are Msgpack-encoded or JSON-encoded objects. You can
+choose between Msgpack (faster) and JSON (slower, human-readable)
+using the `msgformat` attribute of the `Matlab` constructor. There are
+seven messages types used by Python:
 
 * `set_global` and `get_global` set and retrieve a global variable.
 * `set_proxy` and `get_proxy` and `del_proxy` to interact with cached
@@ -204,10 +206,10 @@ Matlab can then respond with one of three message types:
 * `value` for return values.
 * `error` if there was an error during execution.
 
-In addition to the regular JSON data types, _transplant_ uses a
-specially formatted JSON array for transmitting numerical matrices as
-binary data. A numerical 2x2 32-bit integer matrix containing
-`[[1, 2], [3, 4]]` would be encoded as
+In addition to the regular Msgpack/JSON data types, _transplant_ uses
+a specially formatted Msgpack/JSON array for transmitting numerical
+matrices as binary data. A numerical 2x2 32-bit integer matrix
+containing `[[1, 2], [3, 4]]` would be encoded as
 `["__matrix__", "int32", [2, 2], "AQAAAAIAAAADAAAABAAAA==\n"]`, where
 `"int32"` is the data type, `[2, 2]` is the matrix shape and the long
 string is the base64-encoded matrix content. This allows for efficient
@@ -219,21 +221,16 @@ caches its value and returns `["__object__", cache_idx]`. These arrays
 are translated back to their original Matlab values if passed to
 Matlab.
 
-Note that this project includes a JSON serializer/parser and a Base64
-encoder/decoder in pure Matlab.
+Note that this project includes a Msgpack serializer/parser, a JSON
+serializer/parser, and a Base64 encoder/decoder in pure Matlab.
 
 INSTALLATION
 ------------
 
-1. Compile the mex-file _messenger.c_ and link against _libzmq_. You
-   will need to have [0MQ](http://zeromq.org) installed for this. The
-   mex-call could look something like this: `mex -lzmq messenger.c`.
-   On OS X, you typically have to convince the compiler that _mex.h_
-   is actually C code, and that system libraries are actually where
-   they should be: `mex -lzmq messenger.c -I/usr/local/include
-   -Dchar16_t=UINT16_T`.
+1. Install the zeromq library on your computer in a path that is known
+   to Matlab.
 
-2. Add the _messenger_ mexfile and *transplant_remote.m* to your
+2. Add *ZMQ.m*, *transplantzmq.h*, and *transplant_remote.m* to your
    Matlab path.
 
 3. On the Python side, make sure to have PyZMQ and Numpy installed as

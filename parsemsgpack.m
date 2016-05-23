@@ -11,6 +11,7 @@
 
 % (c) 2016 Bastian Bechtold
 % This code is licensed under the BSD 3-clause license
+
 function obj = parsemsgpack(bytes)
     [obj, ~] = parse(uint8(bytes(:)), 1);
 end
