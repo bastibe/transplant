@@ -39,7 +39,7 @@ function transplant_remote(msgformat, url, is_zombie)
     try
         if nargin == 2
             % normal startup
-            messenger('open', msgformat, url); % start 0MQ
+            messenger('open', url); % start 0MQ
             proxied_objects = {};
             is_receiving = false;
         elseif nargin > 2 && is_zombie && ~is_receiving
@@ -148,7 +148,8 @@ function transplant_remote(msgformat, url, is_zombie)
         if strcmp(msgformat, 'msgpack')
             messenger('send', dumpmsgpack(message));
         else
-            messenger('send', dumpjson(message));
+            str = dumpjson(message);
+            messenger('send', unicode2native(str, 'utf-8'));
         end
     end
 
@@ -186,7 +187,8 @@ function transplant_remote(msgformat, url, is_zombie)
         if strcmp(msgformat, 'msgpack')
             message = decode_values(parsemsgpack(blob));
         else
-            message = decode_values(parsejson(blob));
+            str = native2unicode(blob, 'utf-8');
+            message = decode_values(parsejson(str));
         end
     end
 
