@@ -165,7 +165,7 @@ class TransplantMaster:
             for frame in reversed(response['stack']):
                 trace += '  File "{file}", line {line}, in {name}\n'.format(**frame)
                 if frame['file'] is not None and frame['file'].endswith('.m'):
-                    trace += '    ' + open(frame['file'], 'r').readlines()[frame['line']-1].strip(' ')
+                    trace += '    ' + open(frame['file'], 'r').readlines()[int(frame['line'])-1].strip(' ')
             raise TransplantError('{message} ({identifier})\n'.format(**response) + trace,
                               response['stack'], response['identifier'], response['message'])
         return response
@@ -256,6 +256,7 @@ class TransplantMaster:
 
         dtype, shape, data = data[1:]
         out = np.fromstring(base64.b64decode(data.encode()), dtype)
+        shape = [int(n) for n in shape]; # numpy requires integer indices
         return out.reshape(*shape)
 
     def _encode_sparse_matrix(self, data):
@@ -424,7 +425,12 @@ class Matlab(TransplantMaster):
     def _decode_function(self, data):
         """Decode a special list to a wrapper function."""
 
-        def call_matlab(*args, nargout=-1):
-            return self._call(data[1], args, nargout=nargout)
-        call_matlab.__doc__ = self._call('help', [data[1]], nargout=1)
-        return call_matlab
+        class matlab_method:
+            def __call__(_self, *args, nargout=-1):
+                return self._call(data[1], args, nargout=nargout)
+
+            # only fetch documentation when it is actually needed:
+            @property
+            def __doc__(_self):
+                return self._call('help', [data[1]], nargout=1)
+        return matlab_method()

@@ -97,4 +97,4 @@ def test_empty_sparse_matrices(matlab):
     # send an empty sparse matrix to matlab
     assert matlab.issparse(scipy.sparse.csc_matrix(matrix))
     # get an empty sparse matrix from matlab
-    assert isinstance(matlab.sparse(2, 2), scipy.sparse.spmatrix)
+    assert isinstance(matlab.sparse(2.0, 2.0), scipy.sparse.spmatrix)

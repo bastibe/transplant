@@ -60,7 +60,7 @@ function transplant_remote(msgformat, url, is_zombie)
     end
 
     % make sure that transplant doesn't crash on SIGINT
-    zombie = onCleanup(@()transplant_remote(url, msgformat, true));
+    zombie = onCleanup(@()transplant_remote(msgformat, url, true));
 
     while 1 % main messaging loop
 
@@ -395,7 +395,7 @@ end
 % where each `<matrix>` is encoded according `encode_matrix` would be
 % decoded as `[[2, 0], [0, 3]]`.
 function [value] = decode_sparse_matrix(value)
-    shape = cell2mat(value{2});
+    shape = double(cell2mat(value{2}));
     if length(shape) == 0
         shape = [1 1];
     elseif length(shape) == 1
