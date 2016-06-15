@@ -1,6 +1,7 @@
 from subprocess import Popen, DEVNULL, PIPE
 from signal import SIGINT
 import re
+import os
 import tempfile
 import zmq
 import numpy as np
@@ -372,9 +373,15 @@ class Matlab(TransplantMaster):
         if msgformat not in ['msgpack', 'json']:
             raise ValueError('msgformat must be "msgpack" or "json"')
         if address is None:
-            # generate a valid and unique local pathname
-            with tempfile.NamedTemporaryFile() as f:
-                zmq_address = 'ipc://' + f.name
+            if os.name != 'nt':
+                # generate a valid and unique local pathname
+                with tempfile.NamedTemporaryFile() as f:
+                    zmq_address = 'ipc://' + f.name
+            else:
+                # ZMQ does not support ipc:// on Windows, so use tcp:// instead
+                from random import randint
+                port = randint(49152, 65535)
+                zmq_address = 'tcp://127.0.0.1:' + str(port)
             process_arguments = ([executable] + list(arguments) +
                                  ['-r', 'transplant_remote {} {}'.format(msgformat, zmq_address)])
         else:
