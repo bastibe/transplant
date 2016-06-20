@@ -1,5 +1,9 @@
 // from stddef.h:
+#ifdef _WIN32
+typedef unsigned long size_t;
+#else
 typedef long unsigned int size_t;
+#endif
 
 // from zmq.h
 int zmq_errno (void);

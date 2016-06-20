@@ -239,8 +239,30 @@ INSTALLATION
 4. If `matlab` is not reachable in your shell, give the full path to
    your Matlab executable to the `Matlab` constructor.
 
-5. If you indent to start Matlab on a remote computer, make sure that
+5. If you intend to start Matlab on a remote computer, make sure that
    computer is reachable through SSH and fullfills the above steps.
+   
+   
+INSTALLATION GUIDE FOR WINDOWS   
+-----------------------------
+
+1. Install the latest version of zeromq from here:
+   http://zeromq.org/distro:microsoft-windows
+
+2. Rename *libzmq-v90-mt-4_0_4.dll* to *libzmq.dll*
+
+3. Make sure that the libary is in Matlab's path (use `pathtool` or
+   add `addpath('path/to/zeromq/bin')` to your *matlabrc.m*
+
+4. Install a compiler. See here for a list of supported compilers: 
+   http://uk.mathworks.com/support/compilers/R2016a/  
+   Matlab needs a compiler in order to load and use the ZeroMQ library
+   using `loadlibrary`.
+
+5. Now, manually run a *new* Matlab session, and verify that you can
+   manually use `loadlibrary('libzmq.dll', 'transplantzmq.h')` without
+   getting any errors/warnings.
+   
 
 LICENSE
 -------
