@@ -1,5 +1,5 @@
 // from stddef.h:
-typedef long unsigned int size_t;
+//typedef long unsigned int size_t;
 
 // from zmq.h
 int zmq_errno (void);
@@ -17,4 +17,5 @@ void *zmq_msg_data (zmq_msg_t *msg);
 void *zmq_socket (void *, int type);
 int zmq_close (void *s);
 int zmq_connect (void *s, const char *addr);
-int zmq_send (void *s, const void *buf, size_t len, int flags);
+//int zmq_send (void *s, const void *buf, size_t len, int flags);
+int zmq_send (void *s, const void *buf, long unsigned len, int flags);
