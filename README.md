@@ -239,39 +239,29 @@ INSTALLATION
 4. If `matlab` is not reachable in your shell, give the full path to
    your Matlab executable to the `Matlab` constructor.
 
-5. If you indent to start Matlab on a remote computer, make sure that
+5. If you intend to start Matlab on a remote computer, make sure that
    computer is reachable through SSH and fullfills the above steps.
-   
    
    
 INSTALLATION GUIDE FOR WINDOWS   
 -----------------------------
 
-* Install zeromq from here:
-http://zeromq.org/distro:microsoft-windows
-"Stable Release 4.0.4" worked well for me.
+1. Install the latest version of zeromq from here:
+   http://zeromq.org/distro:microsoft-windows
 
-* Copy libzmq-v90-mt-4_0_4.dll into libzmq.dll
+2. Rename *libzmq-v90-mt-4_0_4.dll* to *libzmq.dll*
 
-* Make sure that matlab knows the path of this dll (I don't remember if I did this using the PATH env. variable, or by adding addpath('path/to/zeromq/bin') to matlabrc.m )
+3. Make sure that the libary is in Matlab's path (use `pathtool` or
+   add `addpath('path/to/zeromq/bin')` to your *matlabrc.m*
 
-* Put addpath('path/to/transplant_library') in matlabrc.m
+4. Install a compiler. See here for a list of supported compilers: 
+   http://uk.mathworks.com/support/compilers/R2016a/  
+   Matlab needs a compiler in order to load and use the ZeroMQ library
+   using `loadlibrary`.
 
-* Matlab doesn't always ship with a C/C++ compiler, In my case of Matlab 2014b x64 it didn't.
-Matlab needs a compiler in order to load and use the zeromq binary DLLs, which is a C++ library. Note that it's needed for using matlab "LoadLibrary" function to load any C/C++ DLL.
-
-* In the case that you don't have a compiler that Matlab knows, one of the options that you can do is download  Win 7 SDK.
-https://www.microsoft.com/en-us/download/details.aspx?id=8279
-Note that the sdk installer checks for .net framework 4, and in the likely case that you have a newer version it will not install.
-You can trick it into installing with some simple registry trickery (*remember to restore it back after the installation is complete*)
-Make sure that compilers are selected as a component to be installed.
-Look at the accepted answer here for the registry trickery:
-http://stackoverflow.com/questions/31455926/windows-sdk-setup-failure
-
-* Now, manually run a *new* Matlab session, and verify that you can manually use LoadLibrary('lib
-zmq.dll','transplantzmq.h') without getting any errors/warnings.
-
-* You are ready to go!
+5. Now, manually run a *new* Matlab session, and verify that you can
+   manually use `loadlibrary('libzmq.dll', 'transplantzmq.h')` without
+   getting any errors/warnings.
    
 
 LICENSE
