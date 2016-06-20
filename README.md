@@ -244,7 +244,7 @@ INSTALLATION
    
    
    
-INSALLATION GUIDE FOR WINDOWS   
+INSTALLATION GUIDE FOR WINDOWS   
 -----------------------------
 
 * Install zeromq from here:
