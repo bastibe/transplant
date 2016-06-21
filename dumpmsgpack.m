@@ -20,6 +20,9 @@
 
 function msgpack = dumpmsgpack(data)
     msgpack = dump(data);
+    % collect all parts in a cell array to avoid frequent uint8
+    % concatenations.
+    msgpack = [msgpack{:}];
 end
 
 function msgpack = dump(data)
@@ -44,19 +47,19 @@ function msgpack = dump(data)
     end
 
     if isnumeric(data) && isempty(data)
-        msgpack = uint8(192); % encode nil
+        msgpack = {uint8(192)}; % encode nil
     elseif isa(data, 'uint8')
         msgpack = dumpbin(data);
     elseif islogical(data)
         if data
-            msgpack = uint8(195); % encode true
+            msgpack = {uint8(195)}; % encode true
         else
-            msgpack = uint8(194); % encode false
+            msgpack = {uint8(194)}; % encode false
         end
     elseif isinteger(data)
-        msgpack = dumpinteger(data);
+        msgpack = {dumpinteger(data)};
     elseif isnumeric(data)
-        msgpack = dumpfloat(data);
+        msgpack = {dumpfloat(data)};
     elseif ischar(data)
         msgpack = dumpstring(data);
     elseif iscell(data)
@@ -132,13 +135,13 @@ function msgpack = dumpstring(value)
 
     if len < 32 % encode as fixint:
         % first three bits are 101, last 5 are length:
-        msgpack = [uint8(bitor(len, b10100000)), encoded];
+        msgpack = {uint8(bitor(len, b10100000)), encoded};
     elseif len < 256 % encode as str8
-        msgpack = [uint8([217, len]), encoded];
+        msgpack = {uint8([217, len]), encoded};
     elseif len < 2^16 % encode as str16
-        msgpack = [uint8(218), scalar2bytes(uint16(len)), encoded];
+        msgpack = {uint8(218), scalar2bytes(uint16(len)), encoded};
     elseif len < 2^32 % encode as str32
-        msgpack = [uint8(219), scalar2bytes(uint32(len)), encoded];
+        msgpack = {uint8(219), scalar2bytes(uint32(len)), encoded};
     else
         error('transplant:dumpmsgpack:stringtoolong', ...
               sprintf('String is too long (%d bytes)', len));
@@ -148,11 +151,11 @@ end
 function msgpack = dumpbin(value)
     len = length(value);
     if len < 256 % encode as bin8
-        msgpack = [uint8([196, len]) value(:)'];
+        msgpack = {uint8([196, len]) value(:)'};
     elseif len < 2^16 % encode as bin16
-        msgpack = [uint8(197), scalar2bytes(uint16(len)), value(:)'];
+        msgpack = {uint8(197), scalar2bytes(uint16(len)), value(:)'};
     elseif len < 2^32 % encode as bin32
-        msgpack = [uint8(198), scalar2bytes(uint32(len)), value(:)'];
+        msgpack = {uint8(198), scalar2bytes(uint32(len)), value(:)'};
     else
         error('transplant:dumpmsgpack:bintoolong', ...
               sprintf('Bin is too long (%d bytes)', len));
@@ -176,11 +179,11 @@ function msgpack = dumpcell(value)
     len = length(value);
     if len < 16 % encode as fixarray
         % first four bits are 1001, last 4 are length
-        msgpack = [uint8(bitor(len, b10010000))];
+        msgpack = {uint8(bitor(len, b10010000))};
     elseif len < 2^16 % encode as array16
-        msgpack = [uint8(220), scalar2bytes(uint16(len))];
+        msgpack = {uint8(220), scalar2bytes(uint16(len))};
     elseif len < 2^32 % encode as array32
-        msgpack = [uint8(221), scalar2bytes(uint32(len))];
+        msgpack = {uint8(221), scalar2bytes(uint32(len))};
     else
         error('transplant:dumpmsgpack:arraytoolong', ...
               sprintf('Array is too long (%d elements)', len));
@@ -188,7 +191,8 @@ function msgpack = dumpcell(value)
 
     % write values
     for n=1:len
-        msgpack = [msgpack, dump(value{n})];
+        stuff = dump(value{n});
+        msgpack = [msgpack stuff{:}];
     end
 end
 
@@ -199,11 +203,11 @@ function msgpack = dumpmap(value)
     len = length(value);
     if len < 16 % encode as fixmap
         % first four bits are 1000, last 4 are length
-        msgpack = [uint8(bitor(len, b10000000))];
+        msgpack = {uint8(bitor(len, b10000000))};
     elseif len < 2^16 % encode as map16
-        msgpack = [uint8(222), scalar2bytes(uint16(len))];
+        msgpack = {uint8(222), scalar2bytes(uint16(len))};
     elseif len < 2^32 % encode as map32
-        msgpack = [uint8(223), scalar2bytes(uint32(len))];
+        msgpack = {uint8(223), scalar2bytes(uint32(len))};
     else
         error('transplant:dumpmsgpack:maptoolong', ...
               sprintf('Map is too long (%d elements)', len));
@@ -213,6 +217,8 @@ function msgpack = dumpmap(value)
     keys = value.keys();
     values = value.values();
     for n=1:len
-        msgpack = [msgpack, dump(keys{n}), dump(values{n})];
+        keystuff = dump(keys{n});
+        valuestuff = dump(values{n});
+        msgpack = [msgpack, keystuff{:}, valuestuff{:}];
     end
 end
