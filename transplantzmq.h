@@ -1,5 +1,7 @@
 // from stddef.h:
-#ifdef _WIN32
+#ifdef _WIN64
+typedef unsigned __int64 size_t;
+#elif defined _WIN32
 typedef unsigned long size_t;
 #else
 typedef long unsigned int size_t;
