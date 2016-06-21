@@ -308,7 +308,7 @@ function transplant_remote(msgformat, url, is_zombie)
             binary = cast(value, 'uint8');
         end
         % not all typecasts return column vectors, so use (:)
-        if strcmp(msgformat, 'msgpack')
+        if strcmp(msgformat, 'json')
             binary = base64encode(binary(:));
         else
             binary = binary(:);
