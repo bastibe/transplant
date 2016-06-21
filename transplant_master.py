@@ -152,8 +152,8 @@ class TransplantMaster:
         """Send a message and return the response"""
         kwargs = self._encode_values(kwargs)
         if self.msgformat == 'msgpack':
-            self.socket.send(msgpack.dumps(dict(kwargs, type=msg_type)))
-            response = msgpack.loads(self.socket.recv(), encoding='utf-8')
+            self.socket.send(msgpack.packb(dict(kwargs, type=msg_type), use_bin_type=True))
+            response = msgpack.unpackb(self.socket.recv(), encoding='utf-8')
         else:
             self.socket.send_json(dict(kwargs, type=msg_type))
             response = self.socket.recv_json()
@@ -239,8 +239,12 @@ class TransplantMaster:
 
         """
 
-        return ["__matrix__", data.dtype.name, data.shape,
-                base64.b64encode(data.tostring()).decode()]
+        if self.msgformat == 'json':
+            return ["__matrix__", data.dtype.name, data.shape,
+                    base64.b64encode(data.tostring()).decode()]
+        else:
+            return ["__matrix__", data.dtype.name, data.shape,
+                    data.tobytes()]
 
     def _decode_matrix(self, data):
         """Decode a special list to a Numpy array.
@@ -256,7 +260,10 @@ class TransplantMaster:
         """
 
         dtype, shape, data = data[1:]
-        out = np.fromstring(base64.b64decode(data.encode()), dtype)
+        if isinstance(data, str):
+            out = np.fromstring(base64.b64decode(data.encode()), dtype)
+        else:
+            out = np.fromstring(data, dtype)
         shape = [int(n) for n in shape]; # numpy requires integer indices
         return out.reshape(*shape)
 
@@ -420,7 +427,7 @@ class Matlab(TransplantMaster):
             self.process.send_signal(SIGINT)
             # receive outstanding message to get ZMQ back in the right state
             if self.msgformat == 'msgpack':
-                response = msgpack.loads(self.socket.recv(), encoding='utf-8')
+                response = msgpack.unpackb(self.socket.recv(), encoding='utf-8')
             else:
                 response = self.socket.recv_json()
             # continue with the exception

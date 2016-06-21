@@ -174,7 +174,7 @@ end
 function [out, idx] = parseext(len, bytes, idx)
     obj.type = bytes(idx);
     obj.data = bytes(idx+1:idx+len);
-    idx = idx+len+1;
+    idx = idx + len + 1;
 end
 
 function [out, idx] = parsearray(len, bytes, idx)

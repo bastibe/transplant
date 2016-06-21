@@ -24,7 +24,8 @@ end
 
 function msgpack = dump(data)
     % convert numeric matrices to cell matrices since msgpack doesn't know matrices
-    if (isnumeric(data) || islogical(data)) && ~isscalar(data) && ~isempty(data)
+    if (isnumeric(data) || islogical(data)) && ...
+       ~(isvector(data) && isa(data, 'uint8')) && ~isscalar(data) && ~isempty(data)
         data = num2cell(data);
     end
     % convert character matrices to cell of strings or cell matrices
@@ -44,6 +45,8 @@ function msgpack = dump(data)
 
     if isnumeric(data) && isempty(data)
         msgpack = uint8(192); % encode nil
+    elseif isa(data, 'uint8')
+        msgpack = dumpbin(data);
     elseif islogical(data)
         if data
             msgpack = uint8(195); % encode true
@@ -139,6 +142,20 @@ function msgpack = dumpstring(value)
     else
         error('transplant:dumpmsgpack:stringtoolong', ...
               sprintf('String is too long (%d bytes)', len));
+    end
+end
+
+function msgpack = dumpbin(value)
+    len = length(value);
+    if len < 256 % encode as bin8
+        msgpack = [uint8([196, len]) value(:)'];
+    elseif len < 2^16 % encode as bin16
+        msgpack = [uint8(197), scalar2bytes(uint16(len)), value(:)'];
+    elseif len < 2^32 % encode as bin32
+        msgpack = [uint8(198), scalar2bytes(uint32(len)), value(:)'];
+    else
+        error('transplant:dumpmsgpack:bintoolong', ...
+              sprintf('Bin is too long (%d bytes)', len));
     end
 end
 

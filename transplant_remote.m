@@ -279,130 +279,138 @@ function transplant_remote(msgformat, url, is_zombie)
         end
     end
 
-end
-
-% The matrix `int32([1 2; 3 4])` would be encoded as
-% `{'__matrix__', 'int32', [2, 2], 'AQAAAAIAAAADAAAABAAAA==\n'}`
-%
-% where `'int32'` is the data type, `[2, 2]` is the matrix shape and
-% `'AQAAAAIAAAADAAAABAAAA==\n"'` is the base64-encoded matrix content.
-function [value] = encode_matrix(value)
-    if ~isreal(value) && isinteger(value)
-        value = double(value); % Numpy does not know complex int
-    end
-    % convert column-major (Matlab, FORTRAN) to row-major (C, Python)
-    value = permute(value, length(size(value)):-1:1);
-    % convert to uint8 1-D array
-    if isreal(value)
-        binary = typecast(value(:), 'uint8');
-    else
-        % convert [complex, complex] into [real, imag, real, imag]
-        tmp = zeros(numel(value)*2, 1);
-        if isa(value, 'single')
-            tmp = single(tmp);
+    % The matrix `int32([1 2; 3 4])` would be encoded as
+    % `{'__matrix__', 'int32', [2, 2], 'AQAAAAIAAAADAAAABAAAA==\n'}`
+    %
+    % where `'int32'` is the data type, `[2, 2]` is the matrix shape and
+    % `'AQAAAAIAAAADAAAABAAAA==\n"'` is the base64-encoded matrix content.
+    function [value] = encode_matrix(value)
+        if ~isreal(value) && isinteger(value)
+            value = double(value); % Numpy does not know complex int
         end
-        tmp(1:2:end) = real(value(:));
-        tmp(2:2:end) = imag(value(:));
-        binary = typecast(tmp, 'uint8');
+        % convert column-major (Matlab, FORTRAN) to row-major (C, Python)
+        value = permute(value, length(size(value)):-1:1);
+        % convert to uint8 1-D array
+        if isreal(value)
+            binary = typecast(value(:), 'uint8');
+        else
+            % convert [complex, complex] into [real, imag, real, imag]
+            tmp = zeros(numel(value)*2, 1);
+            if isa(value, 'single')
+                tmp = single(tmp);
+            end
+            tmp(1:2:end) = real(value(:));
+            tmp(2:2:end) = imag(value(:));
+            binary = typecast(tmp, 'uint8');
+        end
+        if islogical(value)
+            % convert logicals (bool) into one-byte-per-bit
+            binary = cast(value, 'uint8');
+        end
+        % not all typecasts return column vectors, so use (:)
+        if strcmp(msgformat, 'msgpack')
+            binary = base64encode(binary(:));
+        else
+            binary = binary(:);
+        end
+        % translate Matlab class names into numpy dtypes
+        if isa(value, 'double') && isreal(value)
+            dtype = 'float64';
+        elseif isa(value, 'double')
+            dtype = 'complex128';
+        elseif isa(value, 'single') && isreal(value)
+            dtype = 'float32';
+        elseif isa(value, 'single')
+            dtype = 'complex64';
+        elseif isa(value, 'logical')
+            dtype = 'bool';
+        elseif isinteger(value)
+            dtype = class(value);
+        else
+            return % don't encode
+        end
+        % save as row-major (C, Python)
+        value = {'__matrix__', dtype, fliplr(size(value)), binary};
     end
-    if islogical(value)
-        % convert logicals (bool) into one-byte-per-bit
-        binary = cast(value, 'uint8');
-    end
-    % not all typecasts return column vectors, so use (:)
-    base64 = base64encode(binary(:));
-    % translate Matlab class names into numpy dtypes
-    if isa(value, 'double') && isreal(value)
-        dtype = 'float64';
-    elseif isa(value, 'double')
-        dtype = 'complex128';
-    elseif isa(value, 'single') && isreal(value)
-        dtype = 'float32';
-    elseif isa(value, 'single')
-        dtype = 'complex64';
-    elseif isa(value, 'logical')
-        dtype = 'bool';
-    elseif isinteger(value)
-        dtype = class(value);
-    else
-        return % don't encode
-    end
-    % save as row-major (C, Python)
-    value = {'__matrix__', dtype, fliplr(size(value)), base64};
-end
 
-% The matrix `int32([1 2; 3 4])` would be encoded as
-% `{'__matrix__', 'int32', [2, 2], 'AQAAAAIAAAADAAAABAAAA==\n'}`
-%
-% where `'int32'` is the data type, `[2, 2]` is the matrix shape and
-% `'AQAAAAIAAAADAAAABAAAA==\n'` is the base64-encoded matrix content.
-function [value] = decode_matrix(value)
-    dtype = value{2};
-    shape = cell2mat(value{3});
-    if length(shape) == 0
-        shape = [1 1];
-    elseif length(shape) == 1
-        shape = [1 shape];
+    % The matrix `int32([1 2; 3 4])` would be encoded as
+    % `{'__matrix__', 'int32', [2, 2], 'AQAAAAIAAAADAAAABAAAA==\n'}`
+    %
+    % where `'int32'` is the data type, `[2, 2]` is the matrix shape and
+    % `'AQAAAAIAAAADAAAABAAAA==\n'` is the base64-encoded matrix content.
+    function [value] = decode_matrix(value)
+        dtype = value{2};
+        shape = cell2mat(value{3});
+        if length(shape) == 0
+            shape = [1 1];
+        elseif length(shape) == 1
+            shape = [1 shape];
+        end
+        if ischar(value{4})
+            binary = base64decode(value{4});
+        else
+            binary = value{4};
+        end
+        % translate numpy dtypes into Matlab class names
+        if strcmp(dtype, 'complex128')
+            value = typecast(binary, 'double')';
+            value = value(1:2:end) + 1i*value(2:2:end);
+        elseif strcmp(dtype, 'float64')
+            value = typecast(binary, 'double')';
+        elseif strcmp(dtype, 'complex64')
+            value = typecast(binary, 'single')';
+            value = value(1:2:end) + 1i*value(2:2:end);
+        elseif strcmp(dtype, 'float32')
+            value = typecast(binary, 'single')';
+        elseif strcmp(dtype, 'bool')
+            value = logical(binary);
+        else
+            value = typecast(binary, dtype);
+        end
+        % convert row-major (C, Python) to column-major (Matlab, FORTRAN)
+        value = reshape(value, fliplr(shape));
+        value = permute(value, length(shape):-1:1);
     end
-    binary = base64decode(value{4});
-    % translate numpy dtypes into Matlab class names
-    if strcmp(dtype, 'complex128')
-        value = typecast(binary, 'double')';
-        value = value(1:2:end) + 1i*value(2:2:end);
-    elseif strcmp(dtype, 'float64')
-        value = typecast(binary, 'double')';
-    elseif strcmp(dtype, 'complex64')
-        value = typecast(binary, 'single')';
-        value = value(1:2:end) + 1i*value(2:2:end);
-    elseif strcmp(dtype, 'float32')
-        value = typecast(binary, 'single')';
-    elseif strcmp(dtype, 'bool')
-        value = logical(binary);
-    else
-        value = typecast(binary, dtype);
-    end
-    % convert row-major (C, Python) to column-major (Matlab, FORTRAN)
-    value = reshape(value, fliplr(shape));
-    value = permute(value, length(shape):-1:1);
-end
 
-% Encode a sparse matrix as a special list.
-% A sparse matrix `[[2, 0], [0, 3]]` would be encoded as
-% `["__sparse__", [2, 2],
-%   <matrix for row indices [0, 1]>,
-%   <matrix for row indices [1, 0]>,
-%   <matrix for values [2, 3]>]`,
-% where each `<matrix>` is encoded according `encode_matrix` and `[2,
-% 2]` is the data shape.
-function [value] = encode_sparse_matrix(value)
-    [row, col, data] = find(value);
-    if numel(data) > 0
-        value = {'__sparse__', fliplr(size(value)), ...
-                 encode_matrix(row-1), encode_matrix(col-1), ...
-                 encode_matrix(data)};
-    else
-        % don't try to encode empty matrices as matrices
-        value = {'__sparse__', fliplr(size(value)), [], [], []};
+    % Encode a sparse matrix as a special list.
+    % A sparse matrix `[[2, 0], [0, 3]]` would be encoded as
+    % `["__sparse__", [2, 2],
+    %   <matrix for row indices [0, 1]>,
+    %   <matrix for row indices [1, 0]>,
+    %   <matrix for values [2, 3]>]`,
+    % where each `<matrix>` is encoded according `encode_matrix` and `[2,
+    % 2]` is the data shape.
+    function [value] = encode_sparse_matrix(value)
+        [row, col, data] = find(value);
+        if numel(data) > 0
+            value = {'__sparse__', fliplr(size(value)), ...
+                     encode_matrix(row-1), encode_matrix(col-1), ...
+                     encode_matrix(data)};
+        else
+            % don't try to encode empty matrices as matrices
+            value = {'__sparse__', fliplr(size(value)), [], [], []};
+        end
     end
-end
 
-% Decode a special list to a sparse matrix.
-% A sparse matrix
-% `["__sparse__", [2, 2],
-%   <matrix for row indices [0, 1]>,
-%   <matrix for row indices [1, 0]>,
-%   <matrix for values [2, 3]>]`,
-% where each `<matrix>` is encoded according `encode_matrix` would be
-% decoded as `[[2, 0], [0, 3]]`.
-function [value] = decode_sparse_matrix(value)
-    shape = double(cell2mat(value{2}));
-    if length(shape) == 0
-        shape = [1 1];
-    elseif length(shape) == 1
-        shape = [1 shape];
+    % Decode a special list to a sparse matrix.
+    % A sparse matrix
+    % `["__sparse__", [2, 2],
+    %   <matrix for row indices [0, 1]>,
+    %   <matrix for row indices [1, 0]>,
+    %   <matrix for values [2, 3]>]`,
+    % where each `<matrix>` is encoded according `encode_matrix` would be
+    % decoded as `[[2, 0], [0, 3]]`.
+    function [value] = decode_sparse_matrix(value)
+        shape = double(cell2mat(value{2}));
+        if length(shape) == 0
+            shape = [1 1];
+        elseif length(shape) == 1
+            shape = [1 shape];
+        end
+        row = double(decode_matrix(value{3}));
+        col = double(decode_matrix(value{4}));
+        data = double(decode_matrix(value{5}));
+        value = sparse(row+1, col+1, data, shape(1), shape(2));
     end
-    row = double(decode_matrix(value{3}));
-    col = double(decode_matrix(value{4}));
-    data = double(decode_matrix(value{5}));
-    value = sparse(row+1, col+1, data, shape(1), shape(2));
+
 end
