@@ -340,7 +340,9 @@ function transplant_remote(msgformat, url, is_zombie)
     % `'AQAAAAIAAAADAAAABAAAA==\n'` is the base64-encoded matrix content.
     function [value] = decode_matrix(value)
         dtype = value{2};
-        shape = cell2mat(value{3});
+        % make sure shape is a double array even if its elements are
+        % less than double:
+        shape = cellfun(@double, value{3});
         if length(shape) == 0
             shape = [1 1];
         elseif length(shape) == 1
