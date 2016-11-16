@@ -40,7 +40,7 @@ function [obj, idx] = parse(bytes, idx)
         return
     elseif bitand(b11100000, currentbyte) == b11100000
         % decode negative fixint
-        obj = -bitand(b00011111, currentbyte);
+        obj = bytes2scalar(currentbyte, 'int8');
         idx = idx + 1;
         return
     elseif bitand(b11110000, currentbyte) == b10000000
