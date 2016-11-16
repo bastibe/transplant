@@ -403,7 +403,9 @@ function transplant_remote(msgformat, url, is_zombie)
     % where each `<matrix>` is encoded according `encode_matrix` would be
     % decoded as `[[2, 0], [0, 3]]`.
     function [value] = decode_sparse_matrix(value)
-        shape = double(cell2mat(value{2}));
+        % make sure shape is a double array even if its elements are
+        % less than double:
+        shape = cellfun(@double, value{2});
         if length(shape) == 0
             shape = [1 1];
         elseif length(shape) == 1

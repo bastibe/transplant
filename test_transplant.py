@@ -98,3 +98,12 @@ def test_empty_sparse_matrices(matlab):
     assert matlab.issparse(scipy.sparse.csc_matrix(matrix))
     # get an empty sparse matrix from matlab
     assert isinstance(matlab.sparse(2.0, 2.0), scipy.sparse.spmatrix)
+
+def test_big_matrices(matlab):
+    matrix = np.zeros([1, 256])
+    x = matlab.sum(matrix)
+    assert x == 0
+
+    import scipy.sparse
+    x = matlab.sum(scipy.sparse.csc_matrix(matrix))
+    assert x == 0
