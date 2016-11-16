@@ -110,7 +110,7 @@ function [obj, idx] = parse(bytes, idx)
         case 208 % int8
             obj = bytes2scalar(bytes(idx+1), 'int8');
             idx = idx+2;
-        case 208 % int16
+        case 209 % int16
             obj = bytes2scalar(bytes(idx+1:idx+2), 'int16');
             idx = idx+3;
         case 210 % int32
