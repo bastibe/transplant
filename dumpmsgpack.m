@@ -48,7 +48,7 @@ function msgpack = dump(data)
 
     if isnumeric(data) && isempty(data)
         msgpack = {uint8(192)}; % encode nil
-    elseif isa(data, 'uint8')
+    elseif isa(data, 'uint8') && numel(data) > 1
         msgpack = dumpbin(data);
     elseif islogical(data)
         if data
