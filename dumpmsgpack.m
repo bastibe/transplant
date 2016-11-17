@@ -78,8 +78,6 @@ function bytes = scalar2bytes(value)
 end
 
 function msgpack = dumpinteger(value)
-    b11110000 = 240;
-
     % if the values are small enough, encode as fixnum:
     if value >= 0 && value < 128
         % first bit is 0, last 7 bits are value
@@ -87,7 +85,7 @@ function msgpack = dumpinteger(value)
         return
     elseif value < 0 && value > -32
         % first three bits are 111, last 5 bytes are value
-        msgpack = uint8(bitor(-value, b11100000));
+        msgpack = typecast(int8(value), 'uint8');
         return
     end
 

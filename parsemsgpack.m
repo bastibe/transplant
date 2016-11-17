@@ -35,12 +35,12 @@ function [obj, idx] = parse(bytes, idx)
 
     if bitand(b10000000, currentbyte) == b00000000
         % decode positive fixint
-        obj = bitand(b01111111, currentbyte);
+        obj = int8(currentbyte);
         idx = idx + 1;
         return
     elseif bitand(b11100000, currentbyte) == b11100000
         % decode negative fixint
-        obj = -bitand(b00011111, currentbyte);
+        obj = typecast(currentbyte, 'int8');
         idx = idx + 1;
         return
     elseif bitand(b11110000, currentbyte) == b10000000
