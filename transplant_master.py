@@ -392,7 +392,8 @@ class Matlab(TransplantMaster):
                 port = randint(49152, 65535)
                 zmq_address = 'tcp://127.0.0.1:' + str(port)
             process_arguments = ([executable] + list(arguments) +
-                                 ['-r', 'transplant_remote {} {}'.format(msgformat, zmq_address)])
+                                 ['-r', "addpath('{}');transplant_remote('{}','{}')".format(
+                                     os.path.dirname(__file__), msgformat, zmq_address)])
         else:
             # get local IP address
             from socket import create_connection
