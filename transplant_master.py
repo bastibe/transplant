@@ -136,11 +136,13 @@ class TransplantMaster:
     def __enter__(self):
         return self
 
-    def __exit__(self):
+    def __exit__(self, exc_type, exc_value, traceback):
         self.close()
 
     def close(self):
         """Close the connection, and kill the process."""
+        if self.process.returncode is not None:
+            return
         self.send_message('die')
         self.process.wait()
 
