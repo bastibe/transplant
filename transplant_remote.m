@@ -33,15 +33,21 @@
 
 function transplant_remote(msgformat, url, is_zombie)
     % this must be persistent to survive a SIGINT:
-    persistent proxied_objects is_receiving
-    % during restarts after a call to exit, normally safe things break,
-    % so just ignore them and continue exiting.
+    persistent proxied_objects is_receiving should_die
+
+    % since the onCleanup prevents direct exit, quit here after revival before
+    % a new onCleanup is created:
+    if should_die
+        quit('force')
+    end
+
     try
         if nargin == 2
             % normal startup
             messenger = ZMQ(url);
             proxied_objects = {};
             is_receiving = false;
+            should_die = false;
         elseif nargin > 2 && is_zombie && ~is_receiving
             % SIGINT has killed transplant_remote, but onCleanup has revived it
             % At this point, neither lasterror nor MException.last is available,
@@ -72,7 +78,12 @@ function transplant_remote(msgformat, url, is_zombie)
             switch msg('type')
                 case 'die' % exit matlab
                     send_ack();
-                    quit('force');
+                    should_die = true;
+                    % At this point, we can't just quit, since onCleanup *will*
+                    % revive us as a zombie. Instead, we mark ourselves as
+                    % suicidial, and return. This will quit Matlab directly
+                    % after revival, before the next onCleanup is created.
+                    return
                 case 'set_global' % save msg.value as a global variable
                     assignin('base', msg('name'), msg('value'));
                     send_ack();
