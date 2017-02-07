@@ -252,6 +252,14 @@ function transplant_remote(msgformat, url, is_zombie)
                 value = proxied_objects{value{2}};
             elseif special && len == 2 && strcmp(value{1}, '__function__')
                 value = str2func(value{2});
+            elseif special && len == 2 && strcmp(value{1}, '__struct__')
+                % convert containers.map to struct
+                out = struct();
+                for key=value{2}.keys()
+                    structkey = matlab.lang.makeValidName(key{1});
+                    out.(structkey) = decode_values(value{2}(key{1}));
+                end
+                value = out;
             else
                 for idx=1:numel(value)
                     value{idx} = decode_values(value{idx});

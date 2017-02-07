@@ -186,6 +186,10 @@ class TransplantMaster:
             return self._encode_sparse_matrix(data)
         elif isinstance(data, self.ProxyObject):
             return self._encode_proxy(data)
+        elif isinstance(data, MatlabStruct):
+            out = ["__struct__", {}]
+            for key in data:
+                out[1][key] = self._encode_values(data[key])
         elif isinstance(data, dict):
             out = {}
             for key in data:
@@ -360,6 +364,11 @@ class MatlabProxyObject:
 
     def __del__(self):
         self.process._del_proxy(self.handle)
+
+
+class MatlabStruct(dict):
+    "Mark a dict to be decoded as struct instead of containers.map"
+    pass
 
 
 class Matlab(TransplantMaster):

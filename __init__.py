@@ -1,1 +1,1 @@
-from .transplant_master import Matlab, TransplantError
+from .transplant_master import Matlab, TransplantError, MatlabStruct
