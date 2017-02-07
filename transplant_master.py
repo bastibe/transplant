@@ -386,7 +386,7 @@ class Matlab(TransplantMaster):
 
     ProxyObject = MatlabProxyObject
 
-    def __init__(self, executable='matlab', arguments=('-nodesktop', '-nosplash'), msgformat='msgpack', address=None, user=None):
+    def __init__(self, executable='matlab', arguments=('-nodesktop', '-nosplash'), msgformat='msgpack', address=None, user=None, print_to_stdout=True):
         """Starts a Matlab instance and opens a communication channel."""
         if msgformat not in ['msgpack', 'json']:
             raise ValueError('msgformat must be "msgpack" or "json"')
@@ -425,7 +425,8 @@ class Matlab(TransplantMaster):
         # C-c of the REPL (start_new_session=True).
         self.process = Popen(process_arguments, stdin=DEVNULL, stdout=PIPE,
                              start_new_session=True)
-        self._start_reader()
+        if print_to_stdout:
+            self._start_reader()
         self.eval('close') # no-op. Wait for Matlab startup to complete.
 
     def _call(self, name, args, nargout=-1):
