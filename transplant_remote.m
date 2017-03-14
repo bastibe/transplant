@@ -111,7 +111,9 @@ function transplant_remote(msgformat, url, is_zombie)
                 case 'get_proxy' % retrieve field value of a cached object
                     obj = proxied_objects{msg('handle')};
                     if any(strcmp(properties(obj), msg('name')))
-                        value = eval(['obj.' msg('name')]);
+                        value = subsref(obj, substruct('.', msg('name')));
+                    elseif any(strcmp(methods(obj), msg('name')))
+                        value = MethodProxy(obj, msg('name'));
                     else
                         value = get(obj, msg('name'));
                     end
@@ -120,7 +122,15 @@ function transplant_remote(msgformat, url, is_zombie)
                     proxied_objects{msg('handle')} = [];
                     send_ack();
                 case 'call' % call a function
-                    fun = str2func(msg('name'));
+                    if ischar(msg('name'))
+                        fun = str2func(msg('name'));
+                    else
+                        proxy = msg('name');
+                        fun = proxy.gethandle();
+                        if ~isKey(msg, 'nargout')
+                            msg('nargout') = nargout(proxy);
+                        end
+                    end
 
                     % get the number of output arguments
                     if isKey(msg, 'nargout') && msg('nargout') >= 0
@@ -230,6 +240,8 @@ function transplant_remote(msgformat, url, is_zombie)
                 out(key{1}) = encode_values(value(key{1}));
             end
             value = out;
+        elseif isa(value, 'MethodProxy')
+            value = {'__function__', encode_object(value)};
         elseif isobject(value)
             value = encode_object(value);
         elseif isa(value, 'function_handle')
@@ -262,7 +274,11 @@ function transplant_remote(msgformat, url, is_zombie)
             elseif special && len == 2 && strcmp(value{1}, '__object__')
                 value = proxied_objects{value{2}};
             elseif special && len == 2 && strcmp(value{1}, '__function__')
-                value = str2func(value{2});
+                if ischar(value{2})
+                    value = str2func(value{2});
+                else
+                    value = proxied_objects{value(2)};
+                end
             elseif special && len == 2 && strcmp(value{1}, '__struct__')
                 % convert containers.map to struct
                 out = struct();

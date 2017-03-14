@@ -32,7 +32,7 @@ function msgpack = dump(data)
         data = num2cell(data);
     end
     % convert character matrices to cell of strings or cell matrices
-    if ischar(data) && ~isvector(data) && ndims(data) == 2
+    if ischar(data) && ~(isvector(data)||isempty(data)) && ndims(data) == 2
         data = cellstr(data);
     elseif ischar(data) && ~isvector(data)
         data = num2cell(data);

@@ -457,5 +457,5 @@ class Matlab(TransplantMaster):
             # only fetch documentation when it is actually needed:
             @property
             def __doc__(_self):
-                return self._call('help', [data[1]], nargout=1)
+                return self.help(data[1], nargout=1)
         return matlab_method()
