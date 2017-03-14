@@ -166,7 +166,7 @@ class TransplantMaster:
             if isinstance(response['stack'], dict):
                 response['stack'] = [response['stack']]
             for frame in reversed(response['stack']):
-                trace += '  File "{file}", line {line}, in {name}\n'.format(**frame)
+                trace += '  File "{file}", line {line:.0f}, in {name}\n'.format(**frame)
                 if frame['file'] is not None and frame['file'].endswith('.m'):
                     trace += '    ' + open(frame['file'], 'r', errors='replace').readlines()[int(frame['line'])-1].strip(' ')
             raise TransplantError('{message} ({identifier})\n'.format(**response) + trace,
