@@ -19,17 +19,39 @@ classdef ZMQ < handle
     methods
         function obj = ZMQ(address)
             ZMQ_REP = 4;
-            if not(libisloaded('libzmq'))
-                [notfound, warnings] = loadlibrary('libzmq', 'transplantzmq.h');
-                assert(isempty(notfound), 'Could not load ZMQ library')
+            try
+                if not(libisloaded('libzmq'))
+                    % try a few common library names:
+                    libnames = {'libzmq', 'libzmq.so.5'};
+                    for libname=libnames
+                        try
+                            [notfound, warnings] = ...
+                                loadlibrary(libname{1}, 'transplantzmq.h', ...
+                                            'alias', 'libzmq');
+                            break % stop trying if we found one that loads
+                        catch error
+                            if ~strcmp(error.identifier, ...
+                                       'MATLAB:loadlibrary:LoadFailed')
+                                throw(error); % something else happened...
+                            end
+                        end
+                    end
+                    % the library did not contain the functions we need:
+                    assert(isempty(notfound), 'Could not load ZMQ library')
+                end
+                obj.context = calllib('libzmq', 'zmq_ctx_new');
+                assert(not(obj.context.isNull), ...
+                       'zmq_ctx_new failed: Could not create context');
+                obj.socket = calllib('libzmq', 'zmq_socket', obj.context, ZMQ_REP);
+                assert(not(obj.socket.isNull), obj.errortext('zmq_socket'));
+                err = calllib('libzmq', 'zmq_connect', obj.socket, address);
+                assert(err == 0, obj.errortext('zmq_connect'));
+            catch exception
+                % print exception, since we probably don't have a working connection
+                % to the transplant master yet for reporting errors properly:
+                disp(['Error loading libzmq: ' exception.message]);
+                throw(exception);
             end
-            obj.context = calllib('libzmq', 'zmq_ctx_new');
-            assert(not(obj.context.isNull), ...
-                   'zmq_ctx_new failed: Could not create context');
-            obj.socket = calllib('libzmq', 'zmq_socket', obj.context, ZMQ_REP);
-            assert(not(obj.socket.isNull), obj.errortext('zmq_socket'));
-            err = calllib('libzmq', 'zmq_connect', obj.socket, address);
-            assert(err == 0, obj.errortext('zmq_connect'));
         end
 
         function str = receive(obj)
@@ -55,6 +77,10 @@ classdef ZMQ < handle
         end
 
         function delete(obj)
+            % if we crashed in the constructor:
+            if ~libisloaded('libzmq')
+                return
+            end
             err = calllib('libzmq', 'zmq_close', obj.socket);
             assert(err == 0, obj.errortext('zmq_close'));
             err = calllib('libzmq', 'zmq_ctx_term', obj.context);
