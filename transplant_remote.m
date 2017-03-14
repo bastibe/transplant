@@ -33,7 +33,7 @@
 
 function transplant_remote(msgformat, url, is_zombie)
     % this must be persistent to survive a SIGINT:
-    persistent proxied_objects is_receiving should_die
+    persistent proxied_objects is_receiving should_die messenger
 
     % since the onCleanup prevents direct exit, quit here after revival before
     % a new onCleanup is created:

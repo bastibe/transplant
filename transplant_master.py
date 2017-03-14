@@ -421,13 +421,11 @@ class Matlab(TransplantMaster):
         self.socket = self.context.socket(zmq.REQ)
         self.socket.bind(zmq_address)
         # start Matlab, but make sure that it won't eat the REPL stdin
-        # (stdin=DEVNULL), and that it won't respond to signals like
-        # C-c of the REPL (start_new_session=True).
-        self.process = Popen(process_arguments, stdin=DEVNULL, stdout=PIPE,
-                             start_new_session=True)
+        # (stdin=DEVNULL).
+        self.process = Popen(process_arguments, stdin=DEVNULL, stdout=PIPE)
         if print_to_stdout:
             self._start_reader()
-        self.eval('close') # no-op. Wait for Matlab startup to complete.
+        self.eval('0;') # no-op. Wait for Matlab startup to complete.
 
     def _call(self, name, args, nargout=-1):
         """Call a function on the remote."""
