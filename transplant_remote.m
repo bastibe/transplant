@@ -91,12 +91,14 @@ function transplant_remote(msgformat, url, is_zombie)
                     % simply evalin('base', msg.name) would call functions,
                     % so that can't be used.
                     existance = evalin('base', ['exist(''' msg('name') ''')']);
+                    % exist doesn't find methods, though.
+                    existance = existance | any(which(msg('name')));
                     % value does not exist:
-                    if existance == 0
+                    if ~existance
                         error('TRANSPLANT:novariable' , ...
                               ['Undefined variable ''' msg('name') '''.']);
-                    % value is a function:
-                    elseif any(existance == [2, 3, 5, 6])
+                    % value is a function or method:
+                    elseif any(existance == [2, 3, 5, 6]) | any(which(msg('name')))
                         value = str2func(msg('name'));
                     else
                         value = evalin('base', msg('name'));
@@ -108,7 +110,11 @@ function transplant_remote(msgformat, url, is_zombie)
                     send_ack();
                 case 'get_proxy' % retrieve field value of a cached object
                     obj = proxied_objects{msg('handle')};
-                    value = get(obj, msg('name'));
+                    if any(strcmp(properties(obj), msg('name')))
+                        value = eval(['obj.' msg('name')]);
+                    else
+                        value = get(obj, msg('name'));
+                    end
                     send_value(value);
                 case 'del_proxy' % invalidate cached object
                     proxied_objects{msg('handle')} = [];
@@ -120,7 +126,12 @@ function transplant_remote(msgformat, url, is_zombie)
                     if isKey(msg, 'nargout') && msg('nargout') >= 0
                         resultsize = msg('nargout');
                     else
-                        resultsize = nargout(fun);
+                        % nargout fails if fun is a method:
+                        try
+                            resultsize = nargout(fun);
+                        catch
+                            resultsize = 0;
+                        end
                     end
 
                     if resultsize > 0
