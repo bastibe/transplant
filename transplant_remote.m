@@ -31,6 +31,9 @@ function transplant_remote(msgformat, url, is_zombie)
     % this must be persistent to survive a SIGINT:
     persistent proxied_objects is_receiving should_die messenger
 
+    % wait for user interaction
+    waitforAllGUIClose = false;
+
     % since the onCleanup prevents direct exit, quit here after revival before
     % a new onCleanup is created:
     if should_die
@@ -138,6 +141,17 @@ function transplant_remote(msgformat, url, is_zombie)
                             send_value(ans);
                         catch err
                             send_ack();
+                        end
+                    end
+                    
+                    % always draw objects
+                    drawnow
+                    % wait for user interaction
+                    if waitforAllGUIClose
+                        hFigure = get(0,'child');
+                        while ~isempty(hFigure)
+                            waitfor(hFigure(1))
+                            hFigure = get(0,'child');
                         end
                     end
             end
