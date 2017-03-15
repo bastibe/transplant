@@ -37,10 +37,6 @@ There are seven request types sent by Python:
 - 'die': the server closes its 0MQ session and quits.
 - 'set_global': saves the 'value' as a global variable called 'name'.
 - 'get_global': retrieves the value of a global variable 'name'.
-- 'set_proxy': saves the 'value' as a field called 'name' on cached
-               object 'handle'.
-- 'get_proxy': retrieves the field called 'name' on cached object
-               'handle'.
 - 'del_proxy': remove cached object 'handle'.
 - 'call': call function 'name' with 'args' and 'nargout'.
 
@@ -90,15 +86,6 @@ class TransplantMaster:
     def _get_global(self, name):
         """Retrieve a value from a named variable."""
         response = self.send_message('get_global', name=name)
-        return response['value']
-
-    def _set_proxy(self, handle, name, value):
-        """Save a value to a named field of a proxy object."""
-        self.send_message('set_proxy', handle=handle, name=name, value=value)
-
-    def _get_proxy(self, handle, name):
-        """Retrieve a value from a named field of a proxy object."""
-        response = self.send_message('get_proxy', handle=handle, name=name)
         return response['value']
 
     def _del_proxy(self, handle):
@@ -348,10 +335,24 @@ class MatlabProxyObject:
         return self.process.fieldnames(self)
 
     def __getattr__(self, name):
-        return self.process._get_proxy(self.handle, name)
+        m = self.process
+        if name in m.properties(self, nargout=1):
+            return m.subsref(self, MatlabStruct(m.substruct('.', name)))
+        if name in m.methods(self, nargout=1):
+            class matlab_method:
+                def __call__(_self, *args, nargout=-1):
+                    return getattr(m, name)(self, *args, nargout=nargout)
+
+                # only fetch documentation when it is actually needed:
+                @property
+                def __doc__(_self):
+                    classname = getattr(m, 'class')(self)
+                    return m.help('{0}.{1}'.format(classname, name), nargout=1)
+            return matlab_method()
 
     def __setattr__(self, name, value):
-        self.process._set_proxy(self.handle, name, value)
+        access = MatlabStruct(self.process.substruct('.', name))
+        self.process.subsasgn(self, access, value)
 
     def __repr__(self):
         getclass = self.process.str2func('class')
@@ -450,7 +451,7 @@ class Matlab(TransplantMaster):
     def _decode_function(self, data):
         """Decode a special list to a wrapper function."""
 
-        class matlab_method:
+        class matlab_function:
             def __call__(_self, *args, nargout=-1):
                 return self._call(data[1], args, nargout=nargout)
 
@@ -458,4 +459,4 @@ class Matlab(TransplantMaster):
             @property
             def __doc__(_self):
                 return self.help(data[1], nargout=1)
-        return matlab_method()
+        return matlab_function()

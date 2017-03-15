@@ -11,10 +11,6 @@
 %    - 'die': closes the 0MQ session and quits Matlab.
 %    - 'set_global': saves the 'value' as a global variable called 'name'.
 %    - 'get_global': retrieve the value of a global variable 'name'.
-%    - 'set_proxy': saves the 'value' as a field called 'name' on cached
-%                   object 'handle'.
-%    - 'get_proxy': retrieves the field called 'name' on cached object
-%                   'handle'.
 %    - 'del_proxy': remove cached object 'handle'.
 %    - 'call': call function 'name' with 'args' and 'nargout'.
 %
@@ -104,33 +100,11 @@ function transplant_remote(msgformat, url, is_zombie)
                         value = evalin('base', msg('name'));
                     end
                     send_value(value);
-                case 'set_proxy' % set field value of a cached object
-                    obj = proxied_objects{msg('handle')};
-                    set(obj, msg.name, msg('value'));
-                    send_ack();
-                case 'get_proxy' % retrieve field value of a cached object
-                    obj = proxied_objects{msg('handle')};
-                    if any(strcmp(properties(obj), msg('name')))
-                        value = subsref(obj, substruct('.', msg('name')));
-                    elseif any(strcmp(methods(obj), msg('name')))
-                        value = MethodProxy(obj, msg('name'));
-                    else
-                        value = get(obj, msg('name'));
-                    end
-                    send_value(value);
                 case 'del_proxy' % invalidate cached object
                     proxied_objects{msg('handle')} = [];
                     send_ack();
                 case 'call' % call a function
-                    if ischar(msg('name'))
-                        fun = str2func(msg('name'));
-                    else
-                        proxy = msg('name');
-                        fun = proxy.gethandle();
-                        if ~isKey(msg, 'nargout')
-                            msg('nargout') = nargout(proxy);
-                        end
-                    end
+                    fun = str2func(msg('name'));
 
                     % get the number of output arguments
                     if isKey(msg, 'nargout') && msg('nargout') >= 0
@@ -140,7 +114,7 @@ function transplant_remote(msgformat, url, is_zombie)
                         try
                             resultsize = nargout(fun);
                         catch
-                            resultsize = 0;
+                            resultsize = -1;
                         end
                     end
 
@@ -240,8 +214,6 @@ function transplant_remote(msgformat, url, is_zombie)
                 out(key{1}) = encode_values(value(key{1}));
             end
             value = out;
-        elseif isa(value, 'MethodProxy')
-            value = {'__function__', encode_object(value)};
         elseif isobject(value)
             value = encode_object(value);
         elseif isa(value, 'function_handle')

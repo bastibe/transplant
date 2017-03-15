@@ -194,8 +194,7 @@ using the `msgformat` attribute of the `Matlab` constructor. There are
 seven messages types used by Python:
 
 * `set_global` and `get_global` set and retrieve a global variable.
-* `set_proxy` and `get_proxy` and `del_proxy` to interact with cached
-  Matlab objects.
+* `del_proxy` removes a cached object.
 * `call` calls a Matlab function with some function arguments and
   returns the result.
 * `die` tells Matlab to shut down.
