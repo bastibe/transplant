@@ -1,7 +1,12 @@
-from subprocess import Popen, DEVNULL, PIPE
+from __future__ import print_function
+from subprocess import Popen, PIPE
+import os
+try:
+    from subprocess import DEVNULL # py3k
+except ImportError:
+    DEVNULL = open(os.devnull, 'wb')
 from signal import SIGINT
 import re
-import os
 import tempfile
 import zmq
 import numpy as np
@@ -340,7 +345,9 @@ class MatlabProxyObject:
             return m.subsref(self, MatlabStruct(m.substruct('.', name)))
         if name in m.methods(self, nargout=1):
             class matlab_method:
-                def __call__(_self, *args, nargout=-1):
+                #def __call__(_self, *args, nargout=-1):
+                def __call__(_self, *args, **kwds):
+                    nargout = kwds.get('nargout', -1)
                     return getattr(m, name)(self, *args, nargout=nargout)
 
                 # only fetch documentation when it is actually needed:
@@ -452,7 +459,10 @@ class Matlab(TransplantMaster):
         """Decode a special list to a wrapper function."""
 
         class matlab_function:
-            def __call__(_self, *args, nargout=-1):
+            #def __call__(_self, *args, nargout=-1):
+            # python 2 compatible header
+            def __call__(_self, *args, **kwds):
+                nargout = kwds.get('nargout', -1)
                 return self._call(data[1], args, nargout=nargout)
 
             # only fetch documentation when it is actually needed:
