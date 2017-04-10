@@ -466,3 +466,27 @@ class Matlab(TransplantMaster):
             def __doc__(_self):
                 return self.help(data[1], nargout=1)
         return matlab_function()
+
+
+    def __getattr__(self, name):
+        """Retrieve a value or function from the remote."""
+        try:
+            return self._get_global(name)
+        except TransplantError as err:
+            #
+            packagedict = self.what(name)
+            is_package = (packagedict and
+                          isinstance(packagedict, dict) and
+                          packagedict['classes'])
+            if not (err.identifier == 'TRANSPLANT:novariable' and is_package):
+                raise err
+            else: # a package of the given name exists. Return a wrapper:
+                class MatlabPackage:
+                    def __getattr__(self_, attrname):
+                        return self._get_global(name + '.' + attrname)
+                    def __repr__(self_):
+                        return "<MatlabPackage {}>".format(name)
+                    @property
+                    def __doc__(_self):
+                        return self.help(name, nargout=1)
+                return MatlabPackage()
