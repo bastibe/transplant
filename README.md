@@ -20,6 +20,13 @@ matrices.
 
 All Matlab functions and objects can be accessed from Python.
 
+RECENT CHANGES
+--------------
+
+- `close` was renamed `exit`. Even though Python typically uses
+  `close` to close files and connections, this conflicts with Matlab's
+  own `close` function. 
+
 STARTING MATLAB
 ----------------
 
@@ -158,11 +165,11 @@ STOPPING MATLAB
 ---------------
 
 Matlab processes end when the `Matlab` instance goes out of scope or
-is explicitly closed using the `close` method. Alternatively, the
+is explicitly closed using the `exit` method. Alternatively, the
 `Matlab` class can be used as a context manager, which will properly
 clean up after itself.
 
-If you are not using the context manager or the `close` method, you
+If you are not using the context manager or the `exit` method, you
 will notice that some Matlab processes don't die when you expect them
 to die. If you are running the regular `python` interpreter, chances
 are that the Matlab process is still referenced to in
@@ -175,7 +182,7 @@ that `ipython` keeps all kinds of references to all kinds of things.
 Sometimes, `%reset` will clear them, sometimes it won't. Sometimes
 they only go away when `ipython` quits. And sometimes, even stopping
 `ipython` doesn't kill it (how is this even possible?). This can be
-quite annoying. Use the `close` method or the context manager to make
+quite annoying. Use the `exit` method or the context manager to make
 sure the processes are stopped correctly.
 
 HOW DOES IT WORK?

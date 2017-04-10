@@ -124,9 +124,9 @@ class TransplantMaster:
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
+        self.exit()
 
-    def close(self):
+    def exit(self):
         """Close the connection, and kill the process."""
         if self.process.returncode is not None:
             return
@@ -135,7 +135,7 @@ class TransplantMaster:
 
     def __del__(self):
         """Close the connection, and kill the process."""
-        self.close()
+        self.exit()
 
     def send_message(self, msg_type, **kwargs):
         """Send a message and return the response"""
@@ -336,8 +336,10 @@ class MatlabProxyObject:
 
     def __getattr__(self, name):
         m = self.process
+        # if it's a property, just retrieve it
         if name in m.properties(self, nargout=1):
             return m.subsref(self, MatlabStruct(m.substruct('.', name)))
+        # if it's a method, wrap it in a functor
         if name in m.methods(self, nargout=1):
             class matlab_method:
                 def __call__(_self, *args, nargout=-1):
