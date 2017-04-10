@@ -368,6 +368,10 @@ class MatlabProxyObject:
     def __del__(self):
         self.process._del_proxy(self.handle)
 
+    @property
+    def __doc__(self):
+        return self.process.help(self, nargout=1)
+
 
 class MatlabStruct(dict):
     "Mark a dict to be decoded as struct instead of containers.map"
