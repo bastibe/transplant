@@ -129,9 +129,9 @@ class TransplantMaster:
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
+        self.exit()
 
-    def close(self):
+    def exit(self):
         """Close the connection, and kill the process."""
         if self.process.returncode is not None:
             return
@@ -140,7 +140,7 @@ class TransplantMaster:
 
     def __del__(self):
         """Close the connection, and kill the process."""
-        self.close()
+        self.exit()
 
     def send_message(self, msg_type, **kwargs):
         """Send a message and return the response"""
@@ -341,8 +341,10 @@ class MatlabProxyObject:
 
     def __getattr__(self, name):
         m = self.process
+        # if it's a property, just retrieve it
         if name in m.properties(self, nargout=1):
             return m.subsref(self, MatlabStruct(m.substruct('.', name)))
+        # if it's a method, wrap it in a functor
         if name in m.methods(self, nargout=1):
             class matlab_method:
                 #def __call__(_self, *args, nargout=-1):
@@ -372,6 +374,10 @@ class MatlabProxyObject:
 
     def __del__(self):
         self.process._del_proxy(self.handle)
+
+    @property
+    def __doc__(self):
+        return self.process.help(self, nargout=1)
 
 
 class MatlabStruct(dict):
@@ -470,3 +476,27 @@ class Matlab(TransplantMaster):
             def __doc__(_self):
                 return self.help(data[1], nargout=1)
         return matlab_function()
+
+
+    def __getattr__(self, name):
+        """Retrieve a value or function from the remote."""
+        try:
+            return self._get_global(name)
+        except TransplantError as err:
+            #
+            packagedict = self.what(name)
+            is_package = (packagedict and
+                          isinstance(packagedict, dict) and
+                          packagedict['classes'])
+            if not (err.identifier == 'TRANSPLANT:novariable' and is_package):
+                raise err
+            else: # a package of the given name exists. Return a wrapper:
+                class MatlabPackage:
+                    def __getattr__(self_, attrname):
+                        return self._get_global(name + '.' + attrname)
+                    def __repr__(self_):
+                        return "<MatlabPackage {}>".format(name)
+                    @property
+                    def __doc__(_self):
+                        return self.help(name, nargout=1)
+                return MatlabPackage()
