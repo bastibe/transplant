@@ -117,12 +117,19 @@ function transplant_remote(msgformat, url, is_zombie)
                             resultsize = -1;
                         end
                     end
-
+                    
                     if resultsize > 0
                         % call the function with the given number of
                         % output arguments:
                         results = cell(resultsize, 1);
                         args = msg('args');
+                        
+                        % convert cell of scalars to matrix
+                        for ii = 1:numel(args)
+                            if iscell(args{ii}) && all(cellfun(@(C)isnumeric(C) && isscalar(C),args{ii}))
+                                args{ii} = cell2mat(args{ii});
+                            end
+                        end
                         [results{:}] = fun(args{:});
                         if length(results) == 1
                             send_value(results{1});
@@ -133,6 +140,14 @@ function transplant_remote(msgformat, url, is_zombie)
                         % try to get output from ans:
                         clear('ans');
                         args = msg('args');
+                        
+                        % convert cell of scalars to matrix
+                        for ii = 1:numel(args)
+                            if iscell(args{ii}) && all(cellfun(@(C)isnumeric(C) && isscalar(C),args{ii}))
+                                args{ii} = cell2mat(args{ii});
+                            end
+                        end
+                        
                         fun(args{:});
                         try
                             send_value(ans);
