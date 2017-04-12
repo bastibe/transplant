@@ -473,17 +473,14 @@ class Matlab(TransplantMaster):
         try:
             return self._get_global(name)
         except TransplantError as err:
-            #
-            packagedict = self.what(name)
-            is_package = (packagedict and
-                          isinstance(packagedict, dict) and
-                          packagedict['classes'])
-            if not (err.identifier == 'TRANSPLANT:novariable' and is_package):
+            # package identifiers for `what` use '/' instead of '.':
+            packagedict = self.what(name.replace('.', '/'))
+            if not (err.identifier == 'TRANSPLANT:novariable' and packagedict):
                 raise err
             else: # a package of the given name exists. Return a wrapper:
                 class MatlabPackage:
                     def __getattr__(self_, attrname):
-                        return self._get_global(name + '.' + attrname)
+                        return self.__getattr__(name + '.' + attrname)
                     def __repr__(self_):
                         return "<MatlabPackage {}>".format(name)
                     @property
