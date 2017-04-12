@@ -407,9 +407,19 @@ class Matlab(TransplantMaster):
                 from random import randint
                 port = randint(49152, 65535)
                 zmq_address = 'tcp://127.0.0.1:' + str(port)
+            import distutils.sysconfig
+            libzmq = distutils.sysconfig.PREFIX + '/lib/'
+            if os.path.exists(libzmq + 'libzmq.so'):
+                libzmq = libzmq + 'libzmq.so';
+            elif os.path.exists(libzmq + 'libzmq.dylib'):
+                libzmq = libzmq + 'libzmq.dylib';
+            elif os.path.exists(libzmq + 'libzmq.dll'):
+                libzmq = libzmq + 'libzmq.dll';
+            else:
+                libzmq = ''
             process_arguments = ([executable] + list(arguments) +
-                                 ['-r', "addpath('{}');transplant_remote('{}','{}')".format(
-                                     os.path.dirname(__file__), msgformat, zmq_address)])
+                                 ['-r', "addpath('{}');transplant_remote('{}','{}','{}')".format(
+                                     os.path.dirname(__file__), msgformat, zmq_address, libzmq)])
         else:
             # get local IP address
             from socket import create_connection
@@ -422,7 +432,8 @@ class Matlab(TransplantMaster):
             if user is not None:
                 address = '{}@{}'.format(user, address)
             process_arguments = (['ssh', address, executable, '-wait'] + list(arguments) +
-                                 ['-r', '"transplant_remote {} {}"'.format(msgformat, zmq_address)])
+                                 ['-r', '"transplant_remote {} {} {}"'
+                                      .format(msgformat, zmq_address, "''")])
         self.msgformat = msgformat
         self.context = zmq.Context.instance()
         self.socket = self.context.socket(zmq.REQ)

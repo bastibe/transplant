@@ -27,7 +27,7 @@
 
 % (c) 2014 Bastian Bechtold
 
-function transplant_remote(msgformat, url, is_zombie)
+function transplant_remote(msgformat, url, zmqname, is_zombie)
     % this must be persistent to survive a SIGINT:
     persistent proxied_objects is_receiving should_die messenger
 
@@ -38,18 +38,18 @@ function transplant_remote(msgformat, url, is_zombie)
     end
 
     try
-        if nargin == 2
+        if nargin == 3
             % normal startup
-            messenger = ZMQ(url);
+            messenger = ZMQ(zmqname, url);
             proxied_objects = {};
             is_receiving = false;
             should_die = false;
-        elseif nargin > 2 && is_zombie && ~is_receiving
+        elseif nargin > 3 && is_zombie && ~is_receiving
             % SIGINT has killed transplant_remote, but onCleanup has revived it
             % At this point, neither lasterror nor MException.last is available,
             % so we don't actually know where we were killed.
             send_ack();
-        elseif nargin > 2 && is_zombie && is_receiving
+        elseif nargin > 3 && is_zombie && is_receiving
             % Sometimes, functions return normally, then trow a delayed error after
             % they return. In that case, we crash within receive_msg. To recover,
             % just continue receiving as if nothing had happened.
@@ -62,7 +62,7 @@ function transplant_remote(msgformat, url, is_zombie)
     end
 
     % make sure that transplant doesn't crash on SIGINT
-    zombie = onCleanup(@()transplant_remote(msgformat, url, true));
+    zombie = onCleanup(@()transplant_remote(msgformat, url, zmqname, true));
 
     while 1 % main messaging loop
 

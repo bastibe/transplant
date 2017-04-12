@@ -17,12 +17,13 @@ classdef ZMQ < handle
         socket
     end
     methods
-        function obj = ZMQ(address)
+        function obj = ZMQ(libname, address)
             ZMQ_REP = 4;
             try
                 if not(libisloaded('libzmq'))
                     % try a few common library names:
-                    libnames = {'libzmq', 'libzmq.so.5'};
+                    libnames = {libname, 'libzmq', 'libzmq.so', 'libzmq.so.5', ...
+                                'libzmq.dylib', 'libzmq.dll'};
                     for libname=libnames
                         try
                             [notfound, warnings] = ...
