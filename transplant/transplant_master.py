@@ -424,8 +424,10 @@ class Matlab(TransplantMaster):
                 else:
                     raise RuntimeError('could not locate libzmq for Matlab')
             process_arguments = ([executable] + list(arguments) +
-                                 ['-r', "addpath('{}');transplant_remote('{}','{}','{}')".format(
-                                     os.path.dirname(__file__), msgformat, zmq_address, libzmq)])
+                                 ['-r', "addpath('{}');cd('{}');"
+                                  "transplant_remote('{}','{}','{}');".format(
+                                      os.path.dirname(__file__), os.getcwd(),
+                                      msgformat, zmq_address, libzmq)])
         else:
             # get local IP address
             from socket import create_connection
