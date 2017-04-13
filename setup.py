@@ -3,7 +3,7 @@
 from distutils.core import setup
 
 setup(name='Transplant',
-      version='0.7',
+      version='0.7.1',
       description='Call Matlab from Python (requires Matlab)',
       author='Bastian Bechtold',
       author_email='basti@bastibe.de',
@@ -22,5 +22,6 @@ setup(name='Transplant',
                    'Operating System :: POSIX :: Linux',
                    'Programming Language :: Python :: 3'],
       license='BSD 3-clause License',
-      requires=['numpy', 'zmq', 'msgpack']
+      install_requires=['numpy', 'pyzmq', 'msgpack-python'],
+      requires=['matlab', 'libzmq']
      )
