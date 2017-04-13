@@ -441,7 +441,7 @@ class Matlab(TransplantMaster):
                 address = '{}@{}'.format(user, address)
             process_arguments = (['ssh', address, executable, '-wait'] + list(arguments) +
                                  ['-r', '"transplant_remote {} {} {}"'
-                                      .format(msgformat, zmq_address, "''")])
+                                      .format(msgformat, zmq_address, "zeromq")])
         self.msgformat = msgformat
         self.context = zmq.Context.instance()
         self.socket = self.context.socket(zmq.REQ)
