@@ -8,6 +8,8 @@ import numpy as np
 import base64
 from threading import Thread
 import msgpack
+import ctypes.util
+
 try:
     from scipy.sparse import spmatrix as sparse_matrix
 except ImportError:
@@ -407,16 +409,20 @@ class Matlab(TransplantMaster):
                 from random import randint
                 port = randint(49152, 65535)
                 zmq_address = 'tcp://127.0.0.1:' + str(port)
-            import distutils.sysconfig
-            libzmq = distutils.sysconfig.PREFIX + '/lib/'
-            if os.path.exists(libzmq + 'libzmq.so'):
-                libzmq = libzmq + 'libzmq.so';
-            elif os.path.exists(libzmq + 'libzmq.dylib'):
-                libzmq = libzmq + 'libzmq.dylib';
-            elif os.path.exists(libzmq + 'libzmq.dll'):
-                libzmq = libzmq + 'libzmq.dll';
-            else:
-                libzmq = ''
+            # search for libzmq:
+            libzmq = ctypes.util.find_library('zmq')
+            if libzmq is None:
+                # search for a conda-installed libzmq
+                import distutils.sysconfig
+                libzmq = distutils.sysconfig.PREFIX + '/lib/'
+                if os.path.exists(libzmq + 'libzmq.so'):
+                    libzmq = libzmq + 'libzmq.so';
+                elif os.path.exists(libzmq + 'libzmq.dylib'):
+                    libzmq = libzmq + 'libzmq.dylib';
+                elif os.path.exists(libzmq + 'libzmq.dll'):
+                    libzmq = libzmq + 'libzmq.dll';
+                else:
+                    raise RuntimeError('could not locate libzmq for Matlab')
             process_arguments = ([executable] + list(arguments) +
                                  ['-r', "addpath('{}');transplant_remote('{}','{}','{}')".format(
                                      os.path.dirname(__file__), msgformat, zmq_address, libzmq)])
