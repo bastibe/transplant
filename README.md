@@ -15,10 +15,11 @@ Transplant is an easy way of calling Matlab from Python.
 ```
 
 Python lists are converted to cell arrays in Matlab, dicts are
-converted to stucts, and numpy matrices are converted do native Matlab
+converted to Maps, and numpy ND-Arrays are converted do native Matlab
 matrices.
 
 All Matlab functions and objects can be accessed from Python.
+
 
 RECENT CHANGES
 --------------
@@ -26,6 +27,9 @@ RECENT CHANGES
 - `close` was renamed `exit`. Even though Python typically uses
   `close` to close files and connections, this conflicts with Matlab's
   own `close` function. 
+- Matlab will now start Matlab at the current working directory.
+- Transplant can now be installed through `pip install transplant`.
+
 
 STARTING MATLAB
 ----------------
@@ -41,9 +45,8 @@ Standard input is suppressed to make REPLs work, so Matlab's `input`
 function will not work.
 
 By default, this will try to call `matlab` on the command line. If you
-want to use a different version of Matlab, or `matlab` is not
-available on the command line, use
-`Matlab(executable='/path/to/matlab')`.
+want to use a different version of Matlab, or `matlab` is not in PATH,
+use `Matlab(executable='/path/to/matlab')`.
 
 By default, Matlab is called with `-nodesktop` and `-nosplash`, so no
 IDE or splash screen show up. If you want to use different arguments,
@@ -61,6 +64,7 @@ computer's command line, and transplant is in the other Matlab's path.
 Note that due to a limitation of Matlab on Windows, command line
 output from Matlabs running on Windows aren't visible to Transplant.
 
+
 CALLING MATLAB 
 --------------
 
@@ -75,17 +79,39 @@ errors (Matlab stack traces will be given, too!).
 
 Input arguments are converted to Matlab data structures:
 
-- Strings and numbers stay strings and numbers
-- `True` and `False` become `logical(1)` and `logical(0)`
-- `None` becomes `[]`
-- Lists become cell arrays
-- Dictionaries become `containers.Map`
-- Numpy arrays become matrices
+| Python Argument                 | Matlab Type                 |
+| ------------------------------- | --------------------------- |
+| `str`                           | `char` vector               |
+| `float`                         | `double` scalar             |
+| `int`                           | an `int{8,16,32,64}` scalar |
+| `True`/`False`                  | `logical` scalar            |
+| `None`                          | `[]`                        |
+| `list`                          | `cell`                      |
+| `dict`                          | `containers.Map`            |
+| `transplant.MatlabStruct(dict)` | `struct`                    |
+| `numpy.ndarray`                 | `double` matrix             |
+| `scipy.sparse`                  | `sparse` matrix             |
+| proxy object                    | original object             |
+
+Return values are treated similarly:
+
+| Matlab Return Value          | Python Type     |
+| ---------------------------- | --------------- |
+| `char` vector                | `str`           |
+| numeric scalar               | number          |
+| `logical` scalar             | `True`/`False`  |
+| `[]`                         | `None`          |
+| `cell`                       | `list`          |
+| `struct` or `containers.Map` | `dict`          |
+| numeric matrix               | `numpy.ndarray` |
+| sparse matrix                | `scipy.sparse`  |
+| function                     | proxy function  |
+| object                       | proxy object    |
 
 If the function returns a function handle or an object, a matching
 Python functions/objects will be created that forwards every access to
-Matlab. These objects and functions can also be handed back to Matlab
-and will work as intended.
+Matlab. Objects can also be handed back to Matlab and will work as
+intended.
 
 ```python
 f = matlab.figure() # create a Figure object
@@ -124,6 +150,7 @@ Python and Matlab, stopping any currently running function. Due to a
 limitation of Matlab, the error and stack trace of that function will
 be lost.
 
+
 MATRIX DIMENSIONS
 -----------------
 
@@ -152,14 +179,15 @@ again identical:
             [[100, 200],      |             20   40
              [300, 400]]])    |            200  400
 
-Even though they look radically different, they both have the same
-shape `(3, 2, 2)`, and are indexed in the same way. The element at
-position `a, b, c` in Python is the same as the element at position
-`a+1, b+1, c+1` in Matlab (`+1` due to zero-based/one-based indexing).
+Even though they look different, they both have the same shape `(3, 2,
+2)`, and are indexed in the same way. The element at position `a, b,
+c` in Python is the same as the element at position `a+1, b+1, c+1` in
+Matlab (`+1` due to zero-based/one-based indexing).
 
 You can think about the difference in presentation like this: Python
 displays multidimensional arrays as `[n,:,:]`, whereas Matlab displays
 them as `(:,:,n)`.
+
 
 STOPPING MATLAB
 ---------------
@@ -185,6 +213,37 @@ they only go away when `ipython` quits. And sometimes, even stopping
 quite annoying. Use the `exit` method or the context manager to make
 sure the processes are stopped correctly.
 
+
+INSTALLATION
+------------
+
+1. Install the zeromq library on your computer and add it to your
+   PATH. Alternatively, Transplant automatically uses `conda`'s zeromq
+   if you use conda.
+   
+2. Install Transplant using `pip install transplant`. This will
+   install `pyzmq`, `numpy` and `msgpack-python` as dependencies.
+
+If you want to run Transplant over the network, the remote Matlab has
+to have access to *ZMQ.m* and *transplant_remote.m* and the zeromq
+library and has to be reachable through SSH.
+   
+INSTALLATION GUIDE FOR WINDOWS   
+-----------------------------
+
+1. Install the latest version of zeromq from here:
+   http://zeromq.org/distro:microsoft-windows
+
+2. Rename *libzmq-v90-mt-4_0_4.dll* to *libzmq.dll* and make sure that
+   the library is available in the system PATH. (You can verify your
+   installation with `ctypes.util.find_library('zmq')`)
+
+3. Install a compiler. See here for a list of supported compilers: 
+   http://uk.mathworks.com/support/compilers/R2017a/  
+   Matlab needs a compiler in order to load and use the ZeroMQ library
+   using `loadlibrary`.
+
+
 HOW DOES IT WORK?
 -----------------
 
@@ -193,7 +252,7 @@ connects to it via [0MQ](http://zeromq.org/) in a request-response
 pattern. Matlab then runs the _transplant_ remote and starts listening
 for messages. Now, Python can send messages to Matlab, and Matlab will
 respond. Roundtrip time for sending/receiving and encoding/decoding
-values from Python to Matlab and back is about 3-7 ms.
+values from Python to Matlab and back is about 2 ms.
 
 All messages are Msgpack-encoded or JSON-encoded objects. You can
 choose between Msgpack (faster) and JSON (slower, human-readable)
@@ -213,13 +272,14 @@ Matlab can then respond with one of three message types:
 * `error` if there was an error during execution.
 
 In addition to the regular Msgpack/JSON data types, _transplant_ uses
-a specially formatted Msgpack/JSON array for transmitting numerical
+specially formatted Msgpack/JSON arrays for transmitting numerical
 matrices as binary data. A numerical 2x2 32-bit integer matrix
 containing `[[1, 2], [3, 4]]` would be encoded as
 `["__matrix__", "int32", [2, 2], "AQAAAAIAAAADAAAABAAAA==\n"]`, where
 `"int32"` is the data type, `[2, 2]` is the matrix shape and the long
 string is the base64-encoded matrix content. This allows for efficient
 data exchange and prevents rounding errors due to JSON serialization.
+In Msgpack, the data is not base64-encoded.
 
 When Matlab returns a function handle, it is encoded as
 `["__function__", func2str(f)]`. When Matlab returns an object, it
@@ -228,56 +288,69 @@ are translated back to their original Matlab values if passed to
 Matlab.
 
 Note that this project includes a Msgpack serializer/parser, a JSON
-serializer/parser, and a Base64 encoder/decoder in pure Matlab.
+serializer/parser, and a Base64 encoder/decoder in pure Matlab.   
 
-INSTALLATION
-------------
-
-1. Install the zeromq library on your computer in a path that is known
-   to Matlab.
-
-2. Add *ZMQ.m*, *transplantzmq.h*, and *transplant_remote.m* to your
-   Matlab path.
-
-3. On the Python side, make sure to have PyZMQ and Numpy installed as
-   well.
-
-4. If `matlab` is not reachable in your shell, give the full path to
-   your Matlab executable to the `Matlab` constructor.
-
-5. If you intend to start Matlab on a remote computer, make sure that
-   computer is reachable through SSH and fullfills the above steps.
-   
-   
-INSTALLATION GUIDE FOR WINDOWS   
------------------------------
-
-1. Install the latest version of zeromq from here:
-   http://zeromq.org/distro:microsoft-windows
-
-2. Rename *libzmq-v90-mt-4_0_4.dll* to *libzmq.dll*
-
-3. Make sure that the libary is in Matlab's path (use `pathtool` or
-   add `addpath('path/to/zeromq/bin')` to your *matlabrc.m*
-
-4. Install a compiler. See here for a list of supported compilers: 
-   http://uk.mathworks.com/support/compilers/R2016a/  
-   Matlab needs a compiler in order to load and use the ZeroMQ library
-   using `loadlibrary`.
-
-5. Now, manually run a *new* Matlab session, and verify that you can
-   manually use `loadlibrary('libzmq.dll', 'transplantzmq.h')` without
-   getting any errors/warnings.
-   
 
 FAQ
 ---
 
 * I get errors with integer numbers  
-  For some reason, many Matlab functions crash if called with integers. Convert your numbers to `float` in Python to fix this problem.
+  Many Matlab functions crash if called with integers. Convert your
+  numbers to `float` in Python to fix this problem.
   
 * How do I pass structs to Matlab?__
-  Since Matlab structs can't use arbitrary keys, all Python dictionaries are converted to Matlab `containers.Map` instead of structs. Wrap your dicts in `MatlabStruct` in Python to have them converted to structs. Note that this will change all invalid keys to whatever Matlab thinks is an appropriate key name using `matlab.lang.makeValidName`.
+  Since Matlab structs can't use arbitrary keys, all Python
+  dictionaries are converted to Matlab `containers.Map` instead of
+  structs. Wrap your dicts in `transplant.MatlabStruct` in Python to
+  have them converted to structs. Note that this will change all
+  invalid keys to whatever Matlab thinks is an appropriate key name
+  using `matlab.lang.makeValidName`.
+  
+  
+SIMILAR PROGRAMS
+----------------
+
+I know of two programs that try to do similar things as Transplant:
+
+- Mathwork's own [MATLAB Engine API for Python][MEfP] provides a
+  CPython extension for calling Matlab code from some versions of
+  Python. In my experience, it is significantly [slower][bde] than
+  Transplant, less feature-complete (no support for non-scalar
+  structs, objects, methods, packages, numpy), and more cumbersome to
+  use (all arguments and return values need to be wrapped in a
+  `matlab.double` instead of Numpy Arrays).
+- Oct2Py calls Octave from Python. It is very similar to Transplant,
+  but uses Octave instead of Matlab. This has huge benefits in startup
+  time, but of course doesn't support all Matlab code.
+
+[MEfP]: http://mathworks.com/help/matlab/matlab-engine-for-python.html
+[bde]: http://bastibe.de/2016-06-21-transplant-revisited.html
+
+KNOWN ISSUES
+-------------
+
+Transplant is a side project of mine that I use for running
+cross-language experiments on a small compute cluster. As such, my
+usage of Transplant is very narrow, and I do not see bugs that don't
+happen in my typical usage. That said, I have used Transplant for
+hundreds of hours, and hundreds of Gigabytes of data without errors.
+
+If you find a bug, or would like to discuss a new feature, or would
+like to contribute code, please open an issue on Github.
+
+I do not have a Windows machine to test Transplant. Windows support
+might contain bugs, but at least one user has used it on Windows in
+the past. If you are hitting problems on Windows, please open an issue
+on Github.
+
+Running Transplant over the network might contain bugs. If you are
+hitting problems, please open an issue on Github.
+
+Finally, I would like to remind you that I am developing this project
+for free, and in my spare time. While I try to be as accomodating as
+possible, I can not guarantee a timely response to issues. Publishing
+Open Source Software on Github does not imply an obligation to *fix
+your problem right now*. Please be civil.
 
 
 LICENSE
