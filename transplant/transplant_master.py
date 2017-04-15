@@ -404,13 +404,15 @@ class Matlab(TransplantMaster):
                 # generate a valid and unique local pathname
                 with tempfile.NamedTemporaryFile() as f:
                     zmq_address = 'ipc://' + f.name
+                libzmq_string = 'zmq'
             else:
                 # ZMQ does not support ipc:// on Windows, so use tcp:// instead
                 from random import randint
                 port = randint(49152, 65535)
                 zmq_address = 'tcp://127.0.0.1:' + str(port)
+                libzmq_string = 'libzmq.dll'
             # search for libzmq:
-            libzmq = ctypes.util.find_library('zmq')
+            libzmq = ctypes.util.find_library(libzmq_string)
             if libzmq is None:
                 # search for a conda-installed libzmq
                 import distutils.sysconfig
