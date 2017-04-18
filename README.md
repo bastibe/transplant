@@ -232,11 +232,12 @@ INSTALLATION GUIDE FOR WINDOWS
 -----------------------------
 
 1. Install the latest version of zeromq from here:
-   http://zeromq.org/distro:microsoft-windows
+   http://zeromq.org/distro:microsoft-windows OR through conda.
 
 2. Rename *libzmq-v90-mt-4_0_4.dll* to *libzmq.dll* and make sure that
-   the library is available in the system PATH. (You can verify your
-   installation with `ctypes.util.find_library('zmq')`)
+   the library is available in the system PATH. You can verify your
+   installation with `ctypes.util.find_library('libzmq.dll')`. (*This
+   step is not necessary if you installed zeromq through conda*)
 
 3. Install a compiler. See here for a list of supported compilers: 
    http://uk.mathworks.com/support/compilers/R2017a/  
