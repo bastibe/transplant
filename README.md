@@ -299,7 +299,7 @@ FAQ
   Many Matlab functions crash if called with integers. Convert your
   numbers to `float` in Python to fix this problem.
   
-* How do I pass structs to Matlab?__
+* How do I pass structs to Matlab?  
   Since Matlab structs can't use arbitrary keys, all Python
   dictionaries are converted to Matlab `containers.Map` instead of
   structs. Wrap your dicts in `transplant.MatlabStruct` in Python to

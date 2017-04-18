@@ -3,7 +3,7 @@
 from distutils.core import setup
 
 setup(name='Transplant',
-      version='0.7.4',
+      version='0.7.5',
       description='Call Matlab from Python (requires Matlab)',
       author='Bastian Bechtold',
       author_email='basti@bastibe.de',
