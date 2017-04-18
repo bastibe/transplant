@@ -43,7 +43,11 @@ function msgpack = dump(data)
     end
     % standardize on always using maps instead of structs
     if isstruct(data)
-        data = containers.Map(fieldnames(data), struct2cell(data));
+        if ~isempty(fieldnames(data))
+            data = containers.Map(fieldnames(data), struct2cell(data));
+        else
+            data = containers.Map();
+        end
     end
 
     if isnumeric(data) && isempty(data)
