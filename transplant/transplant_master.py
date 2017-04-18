@@ -1,5 +1,6 @@
 from subprocess import Popen, DEVNULL, PIPE
 from signal import SIGINT
+import sys
 import re
 import os
 import tempfile
@@ -400,30 +401,27 @@ class Matlab(TransplantMaster):
         if msgformat not in ['msgpack', 'json']:
             raise ValueError('msgformat must be "msgpack" or "json"')
         if address is None:
-            if os.name != 'nt':
+            if sys.platform == 'linux' or sys.platform == 'darwin':
                 # generate a valid and unique local pathname
                 with tempfile.NamedTemporaryFile() as f:
                     zmq_address = 'ipc://' + f.name
-                libzmq_string = 'zmq'
-            else:
+            else: # cygwin/win32
                 # ZMQ does not support ipc:// on Windows, so use tcp:// instead
                 from random import randint
                 port = randint(49152, 65535)
                 zmq_address = 'tcp://127.0.0.1:' + str(port)
-                libzmq_string = 'libzmq.dll'
+
             # search for libzmq:
-            libzmq = ctypes.util.find_library(libzmq_string)
-            if libzmq is None:
-                # search for a conda-installed libzmq
-                import distutils.sysconfig
-                libzmq = distutils.sysconfig.PREFIX + '/lib/'
-                if os.path.exists(libzmq + 'libzmq.so'):
-                    libzmq = libzmq + 'libzmq.so';
-                elif os.path.exists(libzmq + 'libzmq.dylib'):
-                    libzmq = libzmq + 'libzmq.dylib';
-                elif os.path.exists(libzmq + 'libzmq.dll'):
-                    libzmq = libzmq + 'libzmq.dll';
-                else:
+            if sys.platform == 'linux' or sys.platform == 'darwin':
+                libzmq = ctypes.util.find_library('zmq')
+            else: # cygwin/win32
+                libzmq = ctypes.util.find_library('libzmq.dll')
+
+            if libzmq is None: # search for a conda-installed libzmq
+                extensions = {'linux': '.so', 'darwin': '.dylib',
+                              'win32': '.dll', 'cygwin': '.dll'}
+                libzmq = (sys.prefix + '/lib/libzmq' + extensions[sys.platform])
+                if not os.path.exists(libzmq):
                     raise RuntimeError('could not locate libzmq for Matlab')
             process_arguments = ([executable] + list(arguments) +
                                  ['-r', "addpath('{}');cd('{}');"
@@ -443,7 +441,7 @@ class Matlab(TransplantMaster):
                 address = '{}@{}'.format(user, address)
             process_arguments = (['ssh', address, executable, '-wait'] + list(arguments) +
                                  ['-r', '"transplant_remote {} {} {}"'
-                                      .format(msgformat, zmq_address, "zeromq")])
+                                      .format(msgformat, zmq_address, "zmq")])
         self.msgformat = msgformat
         self.context = zmq.Context.instance()
         self.socket = self.context.socket(zmq.REQ)
