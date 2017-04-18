@@ -1,5 +1,6 @@
 from subprocess import Popen, DEVNULL, PIPE
 from signal import SIGINT
+import sys
 import re
 import os
 import tempfile
@@ -8,6 +9,8 @@ import numpy as np
 import base64
 from threading import Thread
 import msgpack
+import ctypes.util
+
 try:
     from scipy.sparse import spmatrix as sparse_matrix
 except ImportError:
@@ -398,18 +401,33 @@ class Matlab(TransplantMaster):
         if msgformat not in ['msgpack', 'json']:
             raise ValueError('msgformat must be "msgpack" or "json"')
         if address is None:
-            if os.name != 'nt':
+            if sys.platform == 'linux' or sys.platform == 'darwin':
                 # generate a valid and unique local pathname
                 with tempfile.NamedTemporaryFile() as f:
                     zmq_address = 'ipc://' + f.name
-            else:
+            else: # cygwin/win32
                 # ZMQ does not support ipc:// on Windows, so use tcp:// instead
                 from random import randint
                 port = randint(49152, 65535)
                 zmq_address = 'tcp://127.0.0.1:' + str(port)
+
+            # search for libzmq:
+            if sys.platform == 'linux' or sys.platform == 'darwin':
+                libzmq = ctypes.util.find_library('zmq')
+            else: # cygwin/win32
+                libzmq = ctypes.util.find_library('libzmq.dll')
+
+            if libzmq is None: # search for a conda-installed libzmq
+                extensions = {'linux': '.so', 'darwin': '.dylib',
+                              'win32': '.dll', 'cygwin': '.dll'}
+                libzmq = (sys.prefix + '/lib/libzmq' + extensions[sys.platform])
+                if not os.path.exists(libzmq):
+                    raise RuntimeError('could not locate libzmq for Matlab')
             process_arguments = ([executable] + list(arguments) +
-                                 ['-r', "addpath('{}');transplant_remote('{}','{}')".format(
-                                     os.path.dirname(__file__), msgformat, zmq_address)])
+                                 ['-r', "addpath('{}');cd('{}');"
+                                  "transplant_remote('{}','{}','{}');".format(
+                                      os.path.dirname(__file__), os.getcwd(),
+                                      msgformat, zmq_address, libzmq)])
         else:
             # get local IP address
             from socket import create_connection
@@ -422,7 +440,8 @@ class Matlab(TransplantMaster):
             if user is not None:
                 address = '{}@{}'.format(user, address)
             process_arguments = (['ssh', address, executable, '-wait'] + list(arguments) +
-                                 ['-r', '"transplant_remote {} {}"'.format(msgformat, zmq_address)])
+                                 ['-r', '"transplant_remote {} {} {}"'
+                                      .format(msgformat, zmq_address, "zmq")])
         self.msgformat = msgformat
         self.context = zmq.Context.instance()
         self.socket = self.context.socket(zmq.REQ)

@@ -17,23 +17,18 @@ classdef ZMQ < handle
         socket
     end
     methods
-        function obj = ZMQ(address)
+        function obj = ZMQ(libname, address)
             ZMQ_REP = 4;
             try
                 if not(libisloaded('libzmq'))
-                    % try a few common library names:
-                    libnames = {'libzmq', 'libzmq.so.5'};
-                    for libname=libnames
-                        try
-                            [notfound, warnings] = ...
-                                loadlibrary(libname{1}, 'transplantzmq.h', ...
-                                            'alias', 'libzmq');
-                            break % stop trying if we found one that loads
-                        catch error
-                            if ~strcmp(error.identifier, ...
-                                       'MATLAB:loadlibrary:LoadFailed')
-                                throw(error); % something else happened...
-                            end
+                    try
+                        [notfound, warnings] = ...
+                            loadlibrary(libname, 'transplantzmq.h', ...
+                                        'alias', 'libzmq');
+                    catch error
+                        if ~strcmp(error.identifier, ...
+                                   'MATLAB:loadlibrary:LoadFailed')
+                            throw(error); % something else happened...
                         end
                     end
                     % the library did not contain the functions we need:
