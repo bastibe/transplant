@@ -227,6 +227,20 @@ INSTALLATION
 If you want to run Transplant over the network, the remote Matlab has
 to have access to *ZMQ.m* and *transplant_remote.m* and the zeromq
 library and has to be reachable through SSH.
+
+INSTALLATION GUIDE FOR LINUX
+----------------------------
+
+1. Install the latest version of zeromq through your package manager.
+   Install version 4 (often called 5).
+
+2. Make sure that Matlab is using the system's version of libstdc++.
+   If it is using an incompatible version, starting Transplant might
+   fail with an error like `GLIBCXX_3.4.21 not found`. If you
+   experience this, disable Matlab's own libstdc++ either by
+   removing/renaming $MATLABROOT/sys/os/glnxa64/libstdc++, or by
+   installing `matlab-support` (if you are running Ubuntu).
+
    
 INSTALLATION GUIDE FOR WINDOWS   
 -----------------------------
@@ -301,6 +315,10 @@ FAQ
   have them converted to structs. Note that this will change all
   invalid keys to whatever Matlab thinks is an appropriate key name
   using `matlab.lang.makeValidName`.
+
+* I get errors like `GLIBCXX_3.4.21 not found`  
+  Matlab's version of libstdc++ is incompatible with your OS's
+  version. See INSTALLATION GUIDE FOR LINUX for details.
   
   
 SIMILAR PROGRAMS
