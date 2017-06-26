@@ -560,8 +560,8 @@ class Matlab(TransplantMaster):
                 if '#' in line:
                     line = line.split('#')[0]
                 if line.startswith('include'):
-                    for search_dir in glob(line[len('include'):]):
-                        search_dirs += read_ldsoconf(search_dir.strip())
+                    for search_dir in glob(line[len('include'):].strip()):
+                        search_dirs += read_ldsoconf(search_dir)
                 elif os.path.isabs(line):
                     search_dirs.append(line.strip())
 
