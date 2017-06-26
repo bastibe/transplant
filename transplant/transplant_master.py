@@ -4,6 +4,7 @@ import sys
 import re
 import os
 import tempfile
+from glob import glob
 import zmq
 import numpy as np
 import base64
@@ -411,23 +412,12 @@ class Matlab(TransplantMaster):
                 port = randint(49152, 65535)
                 zmq_address = 'tcp://127.0.0.1:' + str(port)
 
-            # search for libzmq:
-            if sys.platform == 'linux' or sys.platform == 'darwin':
-                libzmq = ctypes.util.find_library('zmq')
-            else: # cygwin/win32
-                libzmq = ctypes.util.find_library('libzmq.dll')
-
-            if libzmq is None: # search for a conda-installed libzmq
-                extensions = {'linux': '.so', 'darwin': '.dylib',
-                              'win32': '.dll', 'cygwin': '.dll'}
-                libzmq = (sys.prefix + '/lib/libzmq' + extensions[sys.platform])
-                if not os.path.exists(libzmq):
-                    raise RuntimeError('could not locate libzmq for Matlab')
             process_arguments = ([executable] + list(arguments) +
                                  ['-r', "addpath('{}');cd('{}');"
                                   "transplant_remote('{}','{}','{}');".format(
                                       os.path.dirname(__file__), os.getcwd(),
-                                      msgformat, zmq_address, libzmq)])
+                                      msgformat, zmq_address, self._locate_libzmq()
+)])
         else:
             # get local IP address
             from socket import create_connection
@@ -506,3 +496,56 @@ class Matlab(TransplantMaster):
                     def __doc__(_self):
                         return self.help(name, nargout=1)
                 return MatlabPackage()
+
+    def _locate_libzmq(self):
+        """Find the full path to libzmq.
+
+        CFFI can import a library by its name, but Matlab's `loadlibrary`
+        requires the full library path. This walks the file system, and
+        looks for the libzmq binary. If it can't find libzmq in the normal
+        library locations, it additionally tries common install
+        directories such as a conda installation or the ZMQ Windows
+        installer.
+
+        """
+
+        if sys.platform == 'linux' or sys.platform == 'darwin':
+            libzmq = ctypes.util.find_library('zmq')
+        else: # cygwin/win32
+            libzmq = ctypes.util.find_library('libzmq.dll')
+
+        # depending on the OS, either of these outcomes is possible:
+        if libzmq is not None and os.path.isabs(libzmq):
+            return libzmq
+
+        # manually try to locate libzmq
+        if sys.platform == 'linux':
+            # according to man dlopen:
+            search_dirs = [*(os.getenv('LD_LIBRARY_PATH') or '').split(':'),
+                           '/lib/', '/lib64/',
+                           '/usr/lib/', '/usr/lib64/']
+            extension = '.so'
+        elif sys.platform == 'darwin':
+            # according to man dlopen:
+            search_dirs = [*(os.getenv('LD_LIBRARY_PATH') or '').split(':'),
+                           *(os.getenv('DYLD_LIBRARY_PATH') or '').split(':'),
+                           *(os.getenv('DYLD_FALLBACK_PATH') or '').split(':'),
+                           os.getenv('HOME') + '/lib',
+                           '/usr/local/lib',
+                           '/usr/lib']
+            extension = '.dylib'
+        elif sys.platform == 'win32' or sys.platform == 'cygwin':
+            # according to https://msdn.microsoft.com/en-us/library/windows/desktop/ms682586(v=vs.85).aspx
+            search_dirs = [*os.getenv('PATH').split(':'),
+                           'C:/Program Files/ZeroMQ*/bin']
+            extension = '.dll'
+
+        if libzmq is None:
+            libzmq = '*zmq*' + extension
+
+        for directory in search_dirs + [sys.prefix + '/lib']:
+            candidates = glob(directory + '/' + libzmq)
+            if candidates:
+                return candidates[0]
+
+        raise RuntimeError('could not locate libzmq for Matlab')
