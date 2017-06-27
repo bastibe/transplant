@@ -521,24 +521,24 @@ class Matlab(TransplantMaster):
         # manually try to locate libzmq
         if sys.platform == 'linux':
             # according to man dlopen:
-            search_dirs = [*(os.getenv('LD_LIBRARY_PATH') or '').split(':'),
-                           *self._read_ldsoconf('/etc/ld.so.conf'),
-                           '/lib/', '/lib64/',
-                           '/usr/lib/', '/usr/lib64/']
+            search_dirs = ((os.getenv('LD_LIBRARY_PATH') or '').split(':') +
+                           self._read_ldsoconf('/etc/ld.so.conf') +
+                           ['/lib/', '/lib64/',
+                            '/usr/lib/', '/usr/lib64/'])
             extension = '.so'
         elif sys.platform == 'darwin':
             # according to man dlopen:
-            search_dirs = [*(os.getenv('LD_LIBRARY_PATH') or '').split(':'),
-                           *(os.getenv('DYLD_LIBRARY_PATH') or '').split(':'),
-                           *(os.getenv('DYLD_FALLBACK_PATH') or '').split(':'),
-                           os.getenv('HOME') + '/lib',
-                           '/usr/local/lib',
-                           '/usr/lib']
+            search_dirs = ((os.getenv('LD_LIBRARY_PATH') or '').split(':') +
+                           (os.getenv('DYLD_LIBRARY_PATH') or '').split(':') +
+                           (os.getenv('DYLD_FALLBACK_PATH') or '').split(':') +
+                           [os.getenv('HOME') + '/lib',
+                            '/usr/local/lib',
+                            '/usr/lib'])
             extension = '.dylib'
         elif sys.platform == 'win32' or sys.platform == 'cygwin':
             # according to https://msdn.microsoft.com/en-us/library/windows/desktop/ms682586(v=vs.85).aspx
-            search_dirs = [*os.getenv('PATH').split(':'),
-                           'C:/Program Files/ZeroMQ*/bin']
+            search_dirs = ((os.getenv('PATH') or '').split(':') +
+                           ['C:/Program Files/ZeroMQ*/bin'])
             extension = '.dll'
 
         if libzmq is None:

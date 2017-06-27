@@ -3,7 +3,7 @@
 from setuptools import setup
 
 setup(name='Transplant',
-      version='0.7.8',
+      version='0.7.9',
       description='Call Matlab from Python (requires Matlab)',
       author='Bastian Bechtold',
       author_email='basti@bastibe.de',
