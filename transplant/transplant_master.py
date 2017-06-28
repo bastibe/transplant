@@ -443,6 +443,12 @@ class Matlab(TransplantMaster):
             self._start_reader()
         self.eval('0;') # no-op. Wait for Matlab startup to complete.
 
+    def exit(self):
+        """Close the connection, and kill the process."""
+        super(self.__class__, self).exit()
+        self.socket.close()
+        self.context.term()
+
     def _call(self, name, args, nargout=-1):
         """Call a function on the remote."""
         args = list(args)
