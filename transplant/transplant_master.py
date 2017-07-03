@@ -397,10 +397,22 @@ class Matlab(TransplantMaster):
 
     ProxyObject = MatlabProxyObject
 
-    def __init__(self, executable='matlab', arguments=('-nodesktop', '-nosplash'), msgformat='msgpack', address=None, user=None, print_to_stdout=True):
+    def __init__(self, executable='matlab', arguments=tuple(), msgformat='msgpack', address=None, user=None, print_to_stdout=True, desktop=False, jvm=True):
         """Starts a Matlab instance and opens a communication channel."""
         if msgformat not in ['msgpack', 'json']:
             raise ValueError('msgformat must be "msgpack" or "json"')
+
+        # build up command line arguments:
+        if not desktop:
+            if '-nodesktop' not in arguments:
+                arguments += '-nodesktop',
+            if '-nosplash' not in arguments:
+                arguments += '-nosplash',
+            if '-minimize' not in arguments and sys.platform in ('cygwin', 'win32'):
+                arguments += 'minimize',
+        if not jvm and '-nojvm' not in arguments:
+            arguments += '-nojvm',
+
         if address is None:
             if sys.platform == 'linux' or sys.platform == 'darwin':
                 # generate a valid and unique local pathname

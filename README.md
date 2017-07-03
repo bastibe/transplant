@@ -29,6 +29,8 @@ RECENT CHANGES
   own `close` function. 
 - Matlab will now start Matlab at the current working directory.
 - Transplant can now be installed through `pip install transplant`.
+- You can now use `jvm=False` and `desktop=False` to auto-supply
+  common command line arguments for Matlab.
 
 
 STARTING MATLAB
@@ -48,12 +50,16 @@ By default, this will try to call `matlab` on the command line. If you
 want to use a different version of Matlab, or `matlab` is not in PATH,
 use `Matlab(executable='/path/to/matlab')`.
 
-By default, Matlab is called with `-nodesktop` and `-nosplash`, so no
-IDE or splash screen show up. If you want to use different arguments,
-you can supply them like this: `Matlab(arguments=('-nodesktop',
-'-nosplash', '-c licensefile' , '-nojvm'))`. Note that `'-nojvm'` will
-speed up startup considerably, but you won't be able to open figures
-any more.
+By default, Matlab is called with `-nodesktop` and `-nosplash` (and
+`-minimize` on Windows), so no IDE or splash screen show up. You can
+change this by setting `desktop=True`.
+
+You can start Matlab without loading the Java-based GUI system
+(`'-nojvm'`) by setting `jvm=False`. This will speed up startup
+considerably, but you won't be able to open figures any more.
+
+If you want to start Matlab with additional command line arguments,
+you can supply them like this: `Matlab(arguments=['-c licensefile'])`.
 
 By default, Matlab will be started on the local machine. To start
 Matlab on a different computer, supply the IP address of that
@@ -62,7 +68,7 @@ computer is reachable through `ssh`, Matlab is available on the other
 computer's command line, and transplant is in the other Matlab's path.
 
 Note that due to a limitation of Matlab on Windows, command line
-output from Matlabs running on Windows aren't visible to Transplant.
+output from Matlab running on Windows isn't visible to Transplant.
 
 
 CALLING MATLAB 
