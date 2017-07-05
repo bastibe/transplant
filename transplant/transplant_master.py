@@ -409,7 +409,7 @@ class Matlab(TransplantMaster):
             if '-nosplash' not in arguments:
                 arguments += '-nosplash',
             if '-minimize' not in arguments and sys.platform in ('cygwin', 'win32'):
-                arguments += 'minimize',
+                arguments += '-minimize',
         if not jvm and '-nojvm' not in arguments:
             arguments += '-nojvm',
 
