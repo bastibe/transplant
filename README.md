@@ -334,17 +334,20 @@ I know of two programs that try to do similar things as Transplant:
 
 - Mathwork's own [MATLAB Engine API for Python][MEfP] provides a
   CPython extension for calling Matlab code from some versions of
-  Python. In my experience, it is significantly [slower][bde] than
+  Python. In my experience, it is significantly slower than
   Transplant, less feature-complete (no support for non-scalar
   structs, objects, methods, packages, numpy), and more cumbersome to
   use (all arguments and return values need to be wrapped in a
-  `matlab.double` instead of Numpy Arrays).
+  `matlab.double` instead of Numpy Arrays). For a comparison of the
+  two, here are two blog posts on the topic:
+  [Intro to Transplant][bde1], [Transplant speed][bde2].
 - Oct2Py calls Octave from Python. It is very similar to Transplant,
   but uses Octave instead of Matlab. This has huge benefits in startup
   time, but of course doesn't support all Matlab code.
 
 [MEfP]: http://mathworks.com/help/matlab/matlab-engine-for-python.html
-[bde]: http://bastibe.de/2016-06-21-transplant-revisited.html
+[bde1]: http://bastibe.de/2016-06-21-transplant-revisited.html
+[bde2]: http://bastibe.de/2015-11-03-matlab-engine-performance.html
 
 KNOWN ISSUES
 -------------
