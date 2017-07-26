@@ -484,12 +484,16 @@ class Matlab(TransplantMaster):
     def _decode_function(self, data):
         """Decode a special list to a wrapper function."""
 
+        class classproperty(property):
+            def __get__(self, cls, owner):
+                return classmethod(self.fget).__get__(None, owner)()
+
         class matlab_function:
             def __call__(_self, *args, nargout=-1):
                 return self._call(data[1], args, nargout=nargout)
 
             # only fetch documentation when it is actually needed:
-            @property
+            @classproperty
             def __doc__(_self):
                 return self.help(data[1], nargout=1)
         return matlab_function()
