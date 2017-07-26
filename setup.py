@@ -23,5 +23,6 @@ setup(name='Transplant',
                    'Programming Language :: Python :: 3'],
       license='BSD 3-clause License',
       install_requires=['numpy', 'pyzmq', 'msgpack-python'],
+      python_requires='>=3.4',
       requires=['matlab', 'libzmq']
      )
