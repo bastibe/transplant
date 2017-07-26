@@ -325,6 +325,9 @@ FAQ
 * I get errors like `GLIBCXX_3.4.21 not found`  
   Matlab's version of libstdc++ is incompatible with your OS's
   version. See INSTALLATION GUIDE FOR LINUX for details.
+
+* Does Transplant work in Python 2.7?
+  No, it does not.
   
   
 SIMILAR PROGRAMS
