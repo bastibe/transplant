@@ -545,6 +545,7 @@ class Matlab(TransplantMaster):
             # according to man dlopen:
             search_dirs = ((os.getenv('LD_LIBRARY_PATH') or '').split(':') +
                            self._read_ldsoconf('/etc/ld.so.conf') +
+                           self._ask_ld_for_paths() +
                            ['/lib/', '/lib64/',
                             '/usr/lib/', '/usr/lib64/'])
             extension = '.so'
@@ -572,6 +573,18 @@ class Matlab(TransplantMaster):
                 return candidates[0]
 
         raise RuntimeError('could not locate libzmq for Matlab')
+
+    def _ask_ld_for_paths(self):
+        """Asks `ld` for the paths it searches for libraries."""
+
+        try:
+            ld = Popen(['ld', '--verbose'], stdin=DEVNULL, stdout=PIPE)
+            output = ld.stdout.read().decode()
+        except:
+            return []
+
+        search_dirs = re.compile('SEARCH_DIR\(([^)]*)\)').findall(output)
+        return [d.strip(' "') for d in search_dirs]
 
     def _read_ldsoconf(self, file):
         """Read paths from a library list referenced from /etc/ld.so.conf."""
