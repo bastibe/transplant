@@ -445,7 +445,9 @@ class Matlab(TransplantMaster):
                                  ['-r', '"transplant_remote {} {} {}"'
                                       .format(msgformat, zmq_address, "zmq")])
         self.msgformat = msgformat
-        self.context = zmq.Context.instance()
+        # Create a new ZMQ context instead of sharing the global ZMQ context.
+        # We now have ownership of it, and can terminate it with impunity.
+        self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REQ)
         self.socket.bind(zmq_address)
         # start Matlab, but make sure that it won't eat the REPL stdin
