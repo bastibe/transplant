@@ -346,7 +346,9 @@ class MatlabProxyObject:
         # if it's a method, wrap it in a functor
         if name in m.methods(self, nargout=1):
             class matlab_method:
-                def __call__(_self, *args, nargout=-1):
+                def __call__(_self, *args, nargout=-1, **kwargs):
+                    # serialize keyword arguments:
+                    args += sum(kwargs.items(), ())
                     return getattr(m, name)(self, *args, nargout=nargout)
 
                 # only fetch documentation when it is actually needed:
@@ -489,7 +491,9 @@ class Matlab(TransplantMaster):
                 return classmethod(self.fget).__get__(None, owner)()
 
         class matlab_function:
-            def __call__(_self, *args, nargout=-1):
+            def __call__(_self, *args, nargout=-1, **kwargs):
+                # serialize keyword arguments:
+                args += sum(kwargs.items(), ())
                 return self._call(data[1], args, nargout=nargout)
 
             # only fetch documentation when it is actually needed:
