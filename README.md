@@ -29,6 +29,8 @@ RECENT CHANGES
   own `close` function. 
 - Matlab will now start Matlab at the current working directory.
 - Transplant can now be installed through `pip install transplant`.
+- You can now use `jvm=False` and `desktop=False` to auto-supply
+  common command line arguments for Matlab.
 
 
 STARTING MATLAB
@@ -48,12 +50,16 @@ By default, this will try to call `matlab` on the command line. If you
 want to use a different version of Matlab, or `matlab` is not in PATH,
 use `Matlab(executable='/path/to/matlab')`.
 
-By default, Matlab is called with `-nodesktop` and `-nosplash`, so no
-IDE or splash screen show up. If you want to use different arguments,
-you can supply them like this: `Matlab(arguments=('-nodesktop',
-'-nosplash', '-c licensefile' , '-nojvm'))`. Note that `'-nojvm'` will
-speed up startup considerably, but you won't be able to open figures
-any more.
+By default, Matlab is called with `-nodesktop` and `-nosplash` (and
+`-minimize` on Windows), so no IDE or splash screen show up. You can
+change this by setting `desktop=True`.
+
+You can start Matlab without loading the Java-based GUI system
+(`'-nojvm'`) by setting `jvm=False`. This will speed up startup
+considerably, but you won't be able to open figures any more.
+
+If you want to start Matlab with additional command line arguments,
+you can supply them like this: `Matlab(arguments=['-c licensefile'])`.
 
 By default, Matlab will be started on the local machine. To start
 Matlab on a different computer, supply the IP address of that
@@ -62,7 +68,7 @@ computer is reachable through `ssh`, Matlab is available on the other
 computer's command line, and transplant is in the other Matlab's path.
 
 Note that due to a limitation of Matlab on Windows, command line
-output from Matlabs running on Windows aren't visible to Transplant.
+output from Matlab running on Windows isn't visible to Transplant.
 
 
 CALLING MATLAB 
@@ -227,18 +233,28 @@ INSTALLATION
 If you want to run Transplant over the network, the remote Matlab has
 to have access to *ZMQ.m* and *transplant_remote.m* and the zeromq
 library and has to be reachable through SSH.
+
+INSTALLATION GUIDE FOR LINUX
+----------------------------
+
+1. Install the latest version of zeromq through your package manager.
+   Install version 4 (often called 5).
+
+2. Make sure that Matlab is using the system's version of libstdc++.
+   If it is using an incompatible version, starting Transplant might
+   fail with an error like `GLIBCXX_3.4.21 not found`. If you
+   experience this, disable Matlab's own libstdc++ either by
+   removing/renaming $MATLABROOT/sys/os/glnxa64/libstdc++, or by
+   installing `matlab-support` (if you are running Ubuntu).
+
    
 INSTALLATION GUIDE FOR WINDOWS   
 -----------------------------
 
 1. Install the latest version of zeromq from here:
-   http://zeromq.org/distro:microsoft-windows
+   http://zeromq.org/distro:microsoft-windows OR through conda.
 
-2. Rename *libzmq-v90-mt-4_0_4.dll* to *libzmq.dll* and make sure that
-   the library is available in the system PATH. (You can verify your
-   installation with `ctypes.util.find_library('zmq')`)
-
-3. Install a compiler. See here for a list of supported compilers: 
+2. Install a compiler. See here for a list of supported compilers: 
    http://uk.mathworks.com/support/compilers/R2017a/  
    Matlab needs a compiler in order to load and use the ZeroMQ library
    using `loadlibrary`.
@@ -298,13 +314,20 @@ FAQ
   Many Matlab functions crash if called with integers. Convert your
   numbers to `float` in Python to fix this problem.
   
-* How do I pass structs to Matlab?__
+* How do I pass structs to Matlab?  
   Since Matlab structs can't use arbitrary keys, all Python
   dictionaries are converted to Matlab `containers.Map` instead of
   structs. Wrap your dicts in `transplant.MatlabStruct` in Python to
   have them converted to structs. Note that this will change all
   invalid keys to whatever Matlab thinks is an appropriate key name
   using `matlab.lang.makeValidName`.
+
+* I get errors like `GLIBCXX_3.4.21 not found`  
+  Matlab's version of libstdc++ is incompatible with your OS's
+  version. See INSTALLATION GUIDE FOR LINUX for details.
+
+* Does Transplant work in Python 2.7?
+  No, it does not.
   
   
 SIMILAR PROGRAMS
@@ -314,17 +337,20 @@ I know of two programs that try to do similar things as Transplant:
 
 - Mathwork's own [MATLAB Engine API for Python][MEfP] provides a
   CPython extension for calling Matlab code from some versions of
-  Python. In my experience, it is significantly [slower][bde] than
+  Python. In my experience, it is significantly slower than
   Transplant, less feature-complete (no support for non-scalar
   structs, objects, methods, packages, numpy), and more cumbersome to
   use (all arguments and return values need to be wrapped in a
-  `matlab.double` instead of Numpy Arrays).
+  `matlab.double` instead of Numpy Arrays). For a comparison of the
+  two, here are two blog posts on the topic:
+  [Intro to Transplant][bde1], [Transplant speed][bde2].
 - Oct2Py calls Octave from Python. It is very similar to Transplant,
   but uses Octave instead of Matlab. This has huge benefits in startup
   time, but of course doesn't support all Matlab code.
 
 [MEfP]: http://mathworks.com/help/matlab/matlab-engine-for-python.html
-[bde]: http://bastibe.de/2016-06-21-transplant-revisited.html
+[bde1]: http://bastibe.de/2016-06-21-transplant-revisited.html
+[bde2]: http://bastibe.de/2015-11-03-matlab-engine-performance.html
 
 KNOWN ISSUES
 -------------

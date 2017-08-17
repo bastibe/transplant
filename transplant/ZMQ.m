@@ -21,16 +21,9 @@ classdef ZMQ < handle
             ZMQ_REP = 4;
             try
                 if not(libisloaded('libzmq'))
-                    try
-                        [notfound, warnings] = ...
-                            loadlibrary(libname, 'transplantzmq.h', ...
-                                        'alias', 'libzmq');
-                    catch error
-                        if ~strcmp(error.identifier, ...
-                                   'MATLAB:loadlibrary:LoadFailed')
-                            throw(error); % something else happened...
-                        end
-                    end
+                    [notfound, warnings] = ...
+                        loadlibrary(libname, 'transplantzmq.h', ...
+                                    'alias', 'libzmq');
                     % the library did not contain the functions we need:
                     assert(isempty(notfound), 'Could not load ZMQ library')
                 end

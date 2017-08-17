@@ -1,9 +1,18 @@
 #!/usr/bin/env python
 
-from distutils.core import setup
+import sys
+from setuptools import setup
+
+if sys.version_info < (3, 4):
+    error = """
+Transplant does not support Python < 3.4.
+This may be due to an out of date pip.
+Make sure you have pip >= 9.0.1.
+"""
+    sys.exit(error)
 
 setup(name='Transplant',
-      version='0.7.4',
+      version='0.8.2',
       description='Call Matlab from Python (requires Matlab)',
       author='Bastian Bechtold',
       author_email='basti@bastibe.de',
@@ -23,5 +32,6 @@ setup(name='Transplant',
                    'Programming Language :: Python :: 3'],
       license='BSD 3-clause License',
       install_requires=['numpy', 'pyzmq', 'msgpack-python'],
+      python_requires='>=3.4',
       requires=['matlab', 'libzmq']
      )

@@ -110,11 +110,14 @@ function transplant_remote(msgformat, url, zmqname, is_zombie)
                     if isKey(msg, 'nargout') && msg('nargout') >= 0
                         resultsize = msg('nargout');
                     else
-                        % nargout fails if fun is a method:
                         try
                             resultsize = nargout(fun);
-                        catch
-                            resultsize = -1;
+                        catch % nargout fails if fun is a method:
+                            try
+                                resultsize = nargout(msg('name'));
+                            catch
+                                resultsize = -1;
+                            end
                         end
                     end
                     
