@@ -1,10 +1,14 @@
-from subprocess import Popen, DEVNULL, PIPE
+from __future__ import print_function
+from subprocess import Popen, PIPE
+import os
+try:
+    from subprocess import DEVNULL # py3k
+except ImportError:
+    DEVNULL = open(os.devnull, 'wb')
 from signal import SIGINT
 import sys
 import re
-import os
 import tempfile
-from glob import glob
 import zmq
 import numpy as np
 import base64
@@ -158,7 +162,7 @@ class TransplantMaster:
                 response['stack'] = [response['stack']]
             for frame in reversed(response['stack']):
                 trace += '  File "{file}", line {line:.0f}, in {name}\n'.format(**frame)
-                if frame['file'] is not None and os.path.exists(frame['file']) and frame['file'].endswith('.m'):
+                if frame['file'] is not None and frame['file'].endswith('.m'):
                     trace += '    ' + open(frame['file'], 'r', errors='replace').readlines()[int(frame['line'])-1].strip(' ')
             raise TransplantError('{message} ({identifier})\n'.format(**response) + trace,
                               response['stack'], response['identifier'], response['message'])
@@ -346,9 +350,9 @@ class MatlabProxyObject:
         # if it's a method, wrap it in a functor
         if name in m.methods(self, nargout=1):
             class matlab_method:
-                def __call__(_self, *args, nargout=-1, **kwargs):
-                    # serialize keyword arguments:
-                    args += sum(kwargs.items(), ())
+                #def __call__(_self, *args, nargout=-1):
+                def __call__(_self, *args, **kwds):
+                    nargout = kwds.get('nargout', -1)
                     return getattr(m, name)(self, *args, nargout=nargout)
 
                 # only fetch documentation when it is actually needed:
@@ -399,22 +403,10 @@ class Matlab(TransplantMaster):
 
     ProxyObject = MatlabProxyObject
 
-    def __init__(self, executable='matlab', arguments=tuple(), msgformat='msgpack', address=None, user=None, print_to_stdout=True, desktop=False, jvm=True):
+    def __init__(self, executable='matlab', arguments=('-nodesktop', '-nosplash'), msgformat='msgpack', address=None, user=None, print_to_stdout=True):
         """Starts a Matlab instance and opens a communication channel."""
         if msgformat not in ['msgpack', 'json']:
             raise ValueError('msgformat must be "msgpack" or "json"')
-
-        # build up command line arguments:
-        if not desktop:
-            if '-nodesktop' not in arguments:
-                arguments += '-nodesktop',
-            if '-nosplash' not in arguments:
-                arguments += '-nosplash',
-            if '-minimize' not in arguments and sys.platform in ('cygwin', 'win32'):
-                arguments += '-minimize',
-        if not jvm and '-nojvm' not in arguments:
-            arguments += '-nojvm',
-
         if address is None:
             if sys.platform == 'linux' or sys.platform == 'darwin':
                 # generate a valid and unique local pathname
@@ -426,12 +418,23 @@ class Matlab(TransplantMaster):
                 port = randint(49152, 65535)
                 zmq_address = 'tcp://127.0.0.1:' + str(port)
 
+            # search for libzmq:
+            if sys.platform == 'linux' or sys.platform == 'darwin':
+                libzmq = ctypes.util.find_library('zmq')
+            else: # cygwin/win32
+                libzmq = ctypes.util.find_library('libzmq.dll')
+
+            if libzmq is None: # search for a conda-installed libzmq
+                extensions = {'linux': '.so', 'darwin': '.dylib',
+                              'win32': '.dll', 'cygwin': '.dll'}
+                libzmq = (sys.prefix + '/lib/libzmq' + extensions[sys.platform])
+                if not os.path.exists(libzmq):
+                    raise RuntimeError('could not locate libzmq for Matlab')
             process_arguments = ([executable] + list(arguments) +
                                  ['-r', "addpath('{}');cd('{}');"
                                   "transplant_remote('{}','{}','{}');".format(
                                       os.path.dirname(__file__), os.getcwd(),
-                                      msgformat, zmq_address, self._locate_libzmq()
-)])
+                                      msgformat, zmq_address, libzmq)])
         else:
             # get local IP address
             from socket import create_connection
@@ -447,9 +450,7 @@ class Matlab(TransplantMaster):
                                  ['-r', '"transplant_remote {} {} {}"'
                                       .format(msgformat, zmq_address, "zmq")])
         self.msgformat = msgformat
-        # Create a new ZMQ context instead of sharing the global ZMQ context.
-        # We now have ownership of it, and can terminate it with impunity.
-        self.context = zmq.Context()
+        self.context = zmq.Context.instance()
         self.socket = self.context.socket(zmq.REQ)
         self.socket.bind(zmq_address)
         # start Matlab, but make sure that it won't eat the REPL stdin
@@ -458,12 +459,6 @@ class Matlab(TransplantMaster):
         if print_to_stdout:
             self._start_reader()
         self.eval('0;') # no-op. Wait for Matlab startup to complete.
-
-    def exit(self):
-        """Close the connection, and kill the process."""
-        super(self.__class__, self).exit()
-        self.socket.close()
-        self.context.term()
 
     def _call(self, name, args, nargout=-1):
         """Call a function on the remote."""
@@ -488,18 +483,15 @@ class Matlab(TransplantMaster):
     def _decode_function(self, data):
         """Decode a special list to a wrapper function."""
 
-        class classproperty(property):
-            def __get__(self, cls, owner):
-                return classmethod(self.fget).__get__(None, owner)()
-
         class matlab_function:
-            def __call__(_self, *args, nargout=-1, **kwargs):
-                # serialize keyword arguments:
-                args += sum(kwargs.items(), ())
+            #def __call__(_self, *args, nargout=-1):
+            # python 2 compatible header
+            def __call__(_self, *args, **kwds):
+                nargout = kwds.get('nargout', -1)
                 return self._call(data[1], args, nargout=nargout)
 
             # only fetch documentation when it is actually needed:
-            @classproperty
+            @property
             def __doc__(_self):
                 return self.help(data[1], nargout=1)
         return matlab_function()
@@ -524,86 +516,3 @@ class Matlab(TransplantMaster):
                     def __doc__(_self):
                         return self.help(name, nargout=1)
                 return MatlabPackage()
-
-    def _locate_libzmq(self):
-        """Find the full path to libzmq.
-
-        CFFI can import a library by its name, but Matlab's `loadlibrary`
-        requires the full library path. This walks the file system, and
-        looks for the libzmq binary. If it can't find libzmq in the normal
-        library locations, it additionally tries common install
-        directories such as a conda installation or the ZMQ Windows
-        installer.
-
-        """
-
-        if sys.platform == 'linux' or sys.platform == 'darwin':
-            libzmq = ctypes.util.find_library('zmq')
-        else: # cygwin/win32
-            libzmq = ctypes.util.find_library('libzmq.dll')
-
-        # depending on the OS, either of these outcomes is possible:
-        if libzmq is not None and os.path.isabs(libzmq):
-            return libzmq
-
-        # manually try to locate libzmq
-        if sys.platform == 'linux':
-            # according to man dlopen:
-            search_dirs = ((os.getenv('LD_LIBRARY_PATH') or '').split(':') +
-                           self._read_ldsoconf('/etc/ld.so.conf') +
-                           self._ask_ld_for_paths() +
-                           ['/lib/', '/lib64/',
-                            '/usr/lib/', '/usr/lib64/'])
-            extension = '.so'
-        elif sys.platform == 'darwin':
-            # according to man dlopen:
-            search_dirs = ((os.getenv('LD_LIBRARY_PATH') or '').split(':') +
-                           (os.getenv('DYLD_LIBRARY_PATH') or '').split(':') +
-                           (os.getenv('DYLD_FALLBACK_PATH') or '').split(':') +
-                           [os.getenv('HOME') + '/lib',
-                            '/usr/local/lib',
-                            '/usr/lib'])
-            extension = '.dylib'
-        elif sys.platform == 'win32' or sys.platform == 'cygwin':
-            # according to https://msdn.microsoft.com/en-us/library/windows/desktop/ms682586(v=vs.85).aspx
-            search_dirs = ((os.getenv('PATH') or '').split(':') +
-                           ['C:/Program Files/ZeroMQ*/bin'])
-            extension = '.dll'
-
-        if libzmq is None:
-            libzmq = '*zmq*' + extension
-
-        for directory in search_dirs + [sys.prefix + '/lib']:
-            candidates = glob(directory + '/' + libzmq)
-            if candidates:
-                return candidates[0]
-
-        raise RuntimeError('could not locate libzmq for Matlab')
-
-    def _ask_ld_for_paths(self):
-        """Asks `ld` for the paths it searches for libraries."""
-
-        try:
-            ld = Popen(['ld', '--verbose'], stdin=DEVNULL, stdout=PIPE)
-            output = ld.stdout.read().decode()
-        except:
-            return []
-
-        search_dirs = re.compile('SEARCH_DIR\(([^)]*)\)').findall(output)
-        return [d.strip(' "') for d in search_dirs]
-
-    def _read_ldsoconf(self, file):
-        """Read paths from a library list referenced from /etc/ld.so.conf."""
-
-        search_dirs = []
-        with open(file) as f:
-            for line in f:
-                if '#' in line:
-                    line = line.split('#')[0]
-                if line.startswith('include'):
-                    for search_dir in glob(line[len('include'):].strip()):
-                        search_dirs += self._read_ldsoconf(search_dir)
-                elif os.path.isabs(line):
-                    search_dirs.append(line.strip())
-
-        return search_dirs

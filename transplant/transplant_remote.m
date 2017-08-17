@@ -110,22 +110,48 @@ function transplant_remote(msgformat, url, zmqname, is_zombie)
                     if isKey(msg, 'nargout') && msg('nargout') >= 0
                         resultsize = msg('nargout');
                     else
+                        % nargout(fun) fails if fun is a method
+                        % nargout(msg('name')) also works on class methods,
+                        % but can give the wrong result if there are more
+                        % classes with the same name, thus checking with which
+                        % there is no way to call nargout on a class method
+                        % in MATLAB x-(
                         try
-                            resultsize = nargout(fun);
-                        catch % nargout fails if fun is a method:
-                            try
-                                resultsize = nargout(msg('name'));
-                            catch
-                                resultsize = -1;
+                            [~, funType] = which(msg('name'));
+                            funType = strsplit(funType,' ');
+                            if numel(funType)==2 && strcmp(funType{2},'method')
+                                argTemp = msg('args');
+                                className = funType{1};
+                                if ~isempty(argTemp) && isa(argTemp{1},className)
+                                    % we are lucky, the function name
+                                    % corresponds to the class of the first
+                                    % argument
+                                    resultsize = nargout(msg('name'));
+                                    
+                                end
                             end
+
+                            if isempty(resultsize)
+                                % nargout for non-class functions
+                                resultsize = nargout(fun);
+                            end
+                        catch
+                            resultsize = -1;
                         end
                     end
-
+                    
                     if resultsize > 0
                         % call the function with the given number of
                         % output arguments:
                         results = cell(resultsize, 1);
                         args = msg('args');
+                        
+                        % convert cell of scalars to matrix
+                        for ii = 1:numel(args)
+                            if iscell(args{ii}) && all(cellfun(@(C)isnumeric(C) && isscalar(C),args{ii}))
+                                args{ii} = cell2mat(args{ii});
+                            end
+                        end
                         [results{:}] = fun(args{:});
                         if length(results) == 1
                             send_value(results{1});
@@ -136,6 +162,14 @@ function transplant_remote(msgformat, url, zmqname, is_zombie)
                         % try to get output from ans:
                         clear('ans');
                         args = msg('args');
+                        
+                        % convert cell of scalars to matrix
+                        for ii = 1:numel(args)
+                            if iscell(args{ii}) && all(cellfun(@(C)isnumeric(C) && isscalar(C),args{ii}))
+                                args{ii} = cell2mat(args{ii});
+                            end
+                        end
+                        
                         fun(args{:});
                         try
                             send_value(ans);
@@ -364,7 +398,7 @@ function transplant_remote(msgformat, url, zmqname, is_zombie)
         % make sure shape is a double array even if its elements are
         % less than double:
         shape = cellfun(@double, value{3});
-        if length(shape) == 0
+        if numel(shape) == 0
             shape = [1 1];
         elseif length(shape) == 1
             shape = [1 shape];
@@ -427,7 +461,7 @@ function transplant_remote(msgformat, url, zmqname, is_zombie)
         % make sure shape is a double array even if its elements are
         % less than double:
         shape = cellfun(@double, value{2});
-        if length(shape) == 0
+        if numel(shape) == 0
             shape = [1 1];
         elseif length(shape) == 1
             shape = [1 shape];
