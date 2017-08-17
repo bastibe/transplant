@@ -94,7 +94,7 @@ function transplant_remote(msgformat, url, zmqname, is_zombie)
                         error('TRANSPLANT:novariable' , ...
                               ['Undefined variable ''' msg('name') '''.']);
                     % value is a function or method:
-                    elseif any(existance == [2, 3, 5, 6]) | any(which(msg('name')))
+                    elseif any(existance == [2, 3, 5, 6]) || any(which(msg('name')))
                         value = str2func(msg('name'));
                     else
                         value = evalin('base', msg('name'));
@@ -110,14 +110,29 @@ function transplant_remote(msgformat, url, zmqname, is_zombie)
                     if isKey(msg, 'nargout') && msg('nargout') >= 0
                         resultsize = msg('nargout');
                     else
+                        % nargout(fun) throws fails if fun is a method
+                        % nargout(msg('name')) can work on class methods, but
+                        % no way to specify class name in MATLAB x-(
+                        % do extra check on class name using which(msg('name'))
                         try
-                            resultsize = nargout(fun);
-                        catch % nargout fails if fun is a method:
-                            try
-                                resultsize = nargout(msg('name'));
-                            catch
-                                resultsize = -1;
+                            [~, funType] = which(msg('name'));
+                            funType = strsplit(funType,' ');
+                            if numel(funType)==2 && strcmp(funType{2},'method')
+                                argTemp = msg('args');
+                                className = funType{1};
+                                if ~isempty(argTemp) && isa(argTemp{1},className)
+                                    % the function name corresponds to the
+                                    % class of the first argument
+                                    resultsize = nargout(msg('name'));
+                                end
                             end
+                            
+                            if isempty(resultsize)
+                                % nargout on regular functions
+                                resultsize = nargout(fun);
+                            end
+                        catch
+                            resultsize = -1;
                         end
                     end
 
@@ -285,9 +300,9 @@ function transplant_remote(msgformat, url, zmqname, is_zombie)
     % Objects are cached, and they are encoded as special cell arrays
     % `{"__object__", cache_index}`
     function [out] = encode_object(object)
-        if length(object) > 1
-            out = {};
-            for n=1:length(object)
+        if numel(object) > 1
+            out = cell(1,numel(object));
+            for n=1:numel(object)
                 out{n} = encode_object(object(n));
             end
         else
@@ -364,7 +379,7 @@ function transplant_remote(msgformat, url, zmqname, is_zombie)
         % make sure shape is a double array even if its elements are
         % less than double:
         shape = cellfun(@double, value{3});
-        if length(shape) == 0
+        if numel(shape) == 0
             shape = [1 1];
         elseif length(shape) == 1
             shape = [1 shape];
@@ -427,7 +442,7 @@ function transplant_remote(msgformat, url, zmqname, is_zombie)
         % make sure shape is a double array even if its elements are
         % less than double:
         shape = cellfun(@double, value{2});
-        if length(shape) == 0
+        if numel(shape) == 0
             shape = [1 1];
         elseif length(shape) == 1
             shape = [1 shape];
