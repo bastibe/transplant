@@ -7,7 +7,7 @@ Transplant is an easy way of calling Matlab from Python.
  import transplant
  matlab = transplant.Matlab()
  # call Matlab functions:
- n, m = matlab.size([1, 2, 3])
+ length = matlab.numel([1, 2, 3])
  magic = matlab.magic(2)
  spectrum = matlab.fft(numpy.random.randn(100))
  # inject variables into Matlab:
