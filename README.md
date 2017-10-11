@@ -24,6 +24,9 @@ All Matlab functions and objects can be accessed from Python.
 RECENT CHANGES
 --------------
 
+- Should now reliably raise an error if Matlab dies unexpectedly.
+- Keyword arguments are now automatically translated to string-value
+  pairs in Matlab.
 - `close` was renamed `exit`. Even though Python typically uses
   `close` to close files and connections, this conflicts with Matlab's
   own `close` function. 

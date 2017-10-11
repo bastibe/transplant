@@ -12,7 +12,7 @@ Make sure you have pip >= 9.0.1.
     sys.exit(error)
 
 setup(name='Transplant',
-      version='0.8.2',
+      version='0.8.3',
       description='Call Matlab from Python (requires Matlab)',
       author='Bastian Bechtold',
       author_email='basti@bastibe.de',
