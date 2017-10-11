@@ -174,12 +174,10 @@ class TransplantMaster:
     def _wait_socket(self, flags, timeout=1000):
         """Wait for socket or crashed process."""
         while True:
-            isready = self.socket.poll(howlong, flags)
-            if isready != 0:
-                break # ready to receive!
-            else: # no pending events
-                if self.process.poll(): # did the process crash?
-                    raise TransplantError('Process died unexpectedly')
+            if self.process.poll():
+                raise RuntimeError('Process died unexpectedly')
+            if self.socket.poll(timeout, flags) != 0:
+                return
 
     def _encode_values(self, data):
         """Recursively walk through data and encode special entries."""
