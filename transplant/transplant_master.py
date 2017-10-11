@@ -144,12 +144,19 @@ class TransplantMaster:
     def send_message(self, msg_type, **kwargs):
         """Send a message and return the response"""
         kwargs = self._encode_values(kwargs)
+
+        self._wait_socket(zmq.POLLOUT)
         if self.msgformat == 'msgpack':
-            self.socket.send(msgpack.packb(dict(kwargs, type=msg_type), use_bin_type=True))
-            response = msgpack.unpackb(self.socket.recv(), encoding='utf-8')
+            self.socket.send(msgpack.packb(dict(kwargs, type=msg_type), use_bin_type=True), flags=zmq.NOBLOCK)
         else:
-            self.socket.send_json(dict(kwargs, type=msg_type))
-            response = self.socket.recv_json()
+            self.socket.send_json(dict(kwargs, type=msg_type), flags=zmq.NOBLOCK)
+
+        self._wait_socket(zmq.POLLIN)
+        if self.msgformat == 'msgpack':
+            response = msgpack.unpackb(self.socket.recv(flags=zmq.NOBLOCK), encoding='utf-8')
+        else:
+            response = self.socket.recv_json(flags=zmq.NOBLOCK)
+
         response = self._decode_values(response)
         if response['type'] == 'error':
             # Create a pretty backtrace almost like Python's:
@@ -163,6 +170,16 @@ class TransplantMaster:
             raise TransplantError('{message} ({identifier})\n'.format(**response) + trace,
                               response['stack'], response['identifier'], response['message'])
         return response
+
+    def _wait_socket(self, flags, timeout=1000):
+        """Wait for socket or crashed process."""
+        while True:
+            isready = self.socket.poll(howlong, flags)
+            if isready != 0:
+                break # ready to receive!
+            else: # no pending events
+                if self.process.poll(): # did the process crash?
+                    raise TransplantError('Process died unexpectedly')
 
     def _encode_values(self, data):
         """Recursively walk through data and encode special entries."""
