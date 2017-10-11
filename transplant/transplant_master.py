@@ -174,7 +174,7 @@ class TransplantMaster:
     def _wait_socket(self, flags, timeout=1000):
         """Wait for socket or crashed process."""
         while True:
-            if self.process.poll():
+            if self.process.poll() is not None:
                 raise RuntimeError('Process died unexpectedly')
             if self.socket.poll(timeout, flags) != 0:
                 return
