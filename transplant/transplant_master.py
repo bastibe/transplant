@@ -414,7 +414,7 @@ class Matlab(TransplantMaster):
 
     ProxyObject = MatlabProxyObject
 
-    def __init__(self, executable='matlab', arguments=tuple(), msgformat='msgpack', address=None, user=None, print_to_stdout=True, desktop=False, jvm=True):
+    def __init__(self, executable='matlab', env=dict(), arguments=tuple(), msgformat='msgpack', address=None, user=None, print_to_stdout=True, desktop=False, jvm=True):
         """Starts a Matlab instance and opens a communication channel."""
         if msgformat not in ['msgpack', 'json']:
             raise ValueError('msgformat must be "msgpack" or "json"')
@@ -467,9 +467,12 @@ class Matlab(TransplantMaster):
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REQ)
         self.socket.bind(zmq_address)
+        # Get the current environment and update it with the specified changes
+        cur_env = dict(os.environ)
+        cur_env.update(env)
         # start Matlab, but make sure that it won't eat the REPL stdin
         # (stdin=DEVNULL).
-        self.process = Popen(process_arguments, stdin=DEVNULL, stdout=PIPE)
+        self.process = Popen(process_arguments, env=cur_env, stdin=DEVNULL, stdout=PIPE)
         if print_to_stdout:
             self._start_reader()
         self.eval('0;') # no-op. Wait for Matlab startup to complete.
