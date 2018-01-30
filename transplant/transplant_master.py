@@ -588,7 +588,11 @@ class Matlab(TransplantMaster):
         if libzmq is None:
             libzmq = '*zmq*' + extension
 
-        for directory in search_dirs + [sys.prefix + '/lib']:
+        # add anaconda libzmq install locations:
+        search_dirs.append(sys.prefix + '/lib')
+        search_dirs.append(os.path.dirname(zmq.__file__))
+
+        for directory in search_dirs:
             candidates = glob(directory + '/' + libzmq)
             if candidates:
                 return candidates[0]
