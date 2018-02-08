@@ -8,13 +8,13 @@ test_data = np.array([[1, 2, 3],
 
 @pytest.yield_fixture
 def matlab(request):
-    matlab = Matlab(arguments=('-nodesktop', '-nosplash', '-nojvm'))
+    matlab = Matlab(jvm=False)
     yield matlab
     del matlab
 
 def test_put_and_get(matlab):
-    matlab.test = test_data
-    assert np.all(matlab.test == test_data)
+    matlab.test_data = test_data
+    assert np.all(matlab.test_data == test_data)
 
 def test_invalid_get(matlab):
     with pytest.raises(TransplantError):
@@ -59,8 +59,8 @@ def test_matrices(matlab):
                                     (-1+1j)*hard_to_write,
                                     (-1+0j)*hard_to_write])
     # transfer to matlab:
-    matlab.test = impossible_to_write
-    transferred_back = matlab.test
+    matlab.test_data = impossible_to_write
+    transferred_back = matlab.test_data
     def all_indices():
         for a in range(5):
             for b in range(4):
@@ -69,7 +69,7 @@ def test_matrices(matlab):
                         yield (a, b, c, d)
     for a, b, c, d in all_indices():
         p = impossible_to_write[a, b, c, d]
-        evalstr = 'test({},{},{},{})'.format(a+1, b+1, c+1, d+1)
+        evalstr = 'test_data({},{},{},{})'.format(a+1, b+1, c+1, d+1)
         m = matlab.evalin('base', evalstr, nargout=1)
         b = transferred_back[a, b, c, d]
         assert p == m == b
