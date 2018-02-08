@@ -107,3 +107,7 @@ def test_big_matrices(matlab):
     import scipy.sparse
     x = matlab.sum(scipy.sparse.csc_matrix(matrix))
     assert x == 0
+
+def test_function_passing(matlab):
+    x = matlab.feval(matlab.plus, 1., 2.)
+    assert x == 3.

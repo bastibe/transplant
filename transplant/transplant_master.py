@@ -196,6 +196,8 @@ class TransplantMaster:
             out = ["__struct__", {}]
             for key in data:
                 out[1][key] = self._encode_values(data[key])
+        elif isinstance(data, MatlabFunction):
+            out = ["__function__", data._fun]
         elif isinstance(data, dict):
             out = {}
             for key in data:
@@ -399,6 +401,26 @@ class MatlabStruct(dict):
     pass
 
 
+class classproperty(property):
+    def __get__(self, cls, owner):
+        return classmethod(self.fget).__get__(None, owner)()
+
+class MatlabFunction:
+    def __init__(self, parent, fun):
+        self._parent = parent
+        self._fun = fun
+
+    def __call__(self, *args, nargout=-1, **kwargs):
+        # serialize keyword arguments:
+        args += sum(kwargs.items(), ())
+        return self._parent._call(self._fun, args, nargout=nargout)
+
+    # only fetch documentation when it is actually needed:
+    @classproperty
+    def __doc__(self):
+        return self._parent.help(self._fun, nargout=1)
+
+
 class Matlab(TransplantMaster):
     """An instance of Matlab, running in its own process.
 
@@ -503,21 +525,7 @@ class Matlab(TransplantMaster):
     def _decode_function(self, data):
         """Decode a special list to a wrapper function."""
 
-        class classproperty(property):
-            def __get__(self, cls, owner):
-                return classmethod(self.fget).__get__(None, owner)()
-
-        class matlab_function:
-            def __call__(_self, *args, nargout=-1, **kwargs):
-                # serialize keyword arguments:
-                args += sum(kwargs.items(), ())
-                return self._call(data[1], args, nargout=nargout)
-
-            # only fetch documentation when it is actually needed:
-            @classproperty
-            def __doc__(_self):
-                return self.help(data[1], nargout=1)
-        return matlab_function()
+        return MatlabFunction(self, data[1])
 
 
     def __getattr__(self, name):
