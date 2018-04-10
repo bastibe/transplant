@@ -195,7 +195,7 @@ function [obj, idx] = array(json, idx, tokens)
     if json(idx) ~= ']'
         while 1
             [val, idx] = value(json, idx, tokens);
-            obj = [obj, {val}];
+            obj(end+1) = {val};
             idx = next(json, idx);
             if json(idx) == ','
                 idx = idx+1;
