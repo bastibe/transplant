@@ -401,10 +401,6 @@ class MatlabStruct(dict):
     pass
 
 
-class classproperty(property):
-    def __get__(self, cls, owner):
-        return classmethod(self.fget).__get__(None, owner)()
-
 class MatlabFunction:
     def __init__(self, parent, fun):
         self._parent = parent
@@ -414,11 +410,6 @@ class MatlabFunction:
         # serialize keyword arguments:
         args += sum(kwargs.items(), ())
         return self._parent._call(self._fun, args, nargout=nargout)
-
-    # only fetch documentation when it is actually needed:
-    @classproperty
-    def __doc__(self):
-        return self._parent.help(self._fun, nargout=1)
 
 
 class Matlab(TransplantMaster):
@@ -525,7 +516,28 @@ class Matlab(TransplantMaster):
     def _decode_function(self, data):
         """Decode a special list to a wrapper function."""
 
-        return MatlabFunction(self, data[1])
+        # Wrap functions in a MatlabFunction class with a __doc__
+        # property.
+        # However, there are two ways of accessing documentation:
+        # - help(func) will access __doc__ on type(func), so __doc__
+        #   must be accessible on the class of the returned value.
+        # - func.__doc__ must also be accessible on the object itself.
+        #
+        # The following constructs a new class with the appropriate
+        # __doc__ property that is accessible both on the class and
+        # the object.
+
+        class classproperty(property):
+            def __get__(self, cls, owner):
+                return classmethod(self.fget).__get__(None, owner)()
+
+        class ThisFunc(MatlabFunction):
+            # only fetch documentation when it is actually needed:
+            @classproperty
+            def __doc__(_self):
+                return self.help(data[1], nargout=1)
+
+        return ThisFunc(self, data[1])
 
 
     def __getattr__(self, name):

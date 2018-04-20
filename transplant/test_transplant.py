@@ -111,3 +111,9 @@ def test_big_matrices(matlab):
 def test_function_passing(matlab):
     x = matlab.feval(matlab.plus, 1., 2.)
     assert x == 3.
+
+def test_docstring(matlab):
+    docstring = matlab.ones.__doc__
+    assert 'ONES' in docstring
+    classdocstring = type(matlab.ones).__doc__
+    assert 'ONES' in classdocstring
