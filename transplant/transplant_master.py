@@ -474,6 +474,8 @@ class Matlab(TransplantMaster):
             process_arguments = (['ssh', address, executable, '-wait'] + list(arguments) +
                                  ['-r', '"transplant_remote {} {} {}"'
                                       .format(msgformat, zmq_address, "zmq")])
+        if sys.platform == 'win32' or sys.platform == 'cygwin':
+            process_arguments += ['-wait']
         self.msgformat = msgformat
         # Create a new ZMQ context instead of sharing the global ZMQ context.
         # We now have ownership of it, and can terminate it with impunity.
