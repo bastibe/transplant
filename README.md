@@ -387,7 +387,7 @@ LICENSE
 
 MATLAB (R) is copyright of the Mathworks
 
-Copyright (c) 2014 Bastian Bechtold
+Copyright (c) 2014-2018 Bastian Bechtold
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
