@@ -346,9 +346,15 @@ class TransplantMaster:
 
 
 class MatlabProxyObject:
-    """Forwards all property access to an associated Matlab object."""
+    """A Proxy for an object that exists in Matlab.
+
+    All property accesses and function calls are executed on the
+    Matlab object in Matlab.
+
+    """
 
     def __init__(self, process, handle):
+        """foo"""
         self.__dict__['handle'] = handle
         self.__dict__['process'] = process
 
@@ -402,6 +408,16 @@ class MatlabStruct(dict):
 
 
 class MatlabFunction:
+    """A Proxy for a Matlab function.
+
+    Calling this function will transfer all function arguments from
+    Python to Matlab, and translate them to the appropriate Matlab
+    data structures.
+
+    Return values are translated the same way, and transferred back to
+    Python.
+
+    """
     def __init__(self, parent, fun):
         self._parent = parent
         self._fun = fun
@@ -415,13 +431,38 @@ class MatlabFunction:
 class Matlab(TransplantMaster):
     """An instance of Matlab, running in its own process.
 
-    if `address` is supplied, Matlab is started on a remote machine.
+    if ``address`` is supplied, Matlab is started on a remote machine.
     This is done by opening an SSH connection to that machine
-    (optionally using user account `user`), and then starting Matlab
+    (optionally using user account ``user``), and then starting Matlab
     on that machine. For this to work, `address` must be reachable
-    using SSH, `matlab` must be in the `user`'s PATH, and
-    `transplant_remote` must be in Matlab's `path` and `messenger`
-    must be available on both the local and the remote machine.
+    using SSH, ``matlab`` must be in the ``user``'s PATH, and
+    ``transplant_remote`` must be in Matlab's ``path`` and
+    ``messenger`` must be available on both the local and the remote
+    machine.
+
+    Parameters
+    ----------
+    executable : str
+        The executable name, defaults to ``matlab``.
+    arguments : tuple
+        Additional arguments to supply to the executable, defaults to
+        ``-nodesktop``, ``-nosplash``, and on Windows, ``-minimize``.
+    msgformat : str
+        The communication format to use for talking to Matlab,
+        defaults to ``"msgpack"``. For debugging, you can use
+        ``"json"`` instead.
+    address : str
+        An address of a remote SSH-reachable machine on which to call
+        Matlab.
+    user : str
+        The user name to use for the SSH connection (if ``address`` is
+        given).
+    print_to_stdout : bool
+        Whether to print outputs to stdout, defaults to ``True``.
+    desktop : bool
+        Whether to start Matlab with ``-nodesktop``, defaults to ``True``.
+    jvm : bool
+        Whether to start Matlab with ``-nojvm``, defaults to ``False``.
 
     """
 
@@ -543,7 +584,15 @@ class Matlab(TransplantMaster):
 
 
     def __getattr__(self, name):
-        """Retrieve a value or function from the remote."""
+        """Retrieve a value or function from the remote.
+
+        Global variables are returned as native Python objects or
+        :class:`MatlabProxyObject` objects.
+
+        Functions are returned as :class:`MatlabFunction` objects.
+
+        """
+
         try:
             return self._get_global(name)
         except TransplantError as err:
