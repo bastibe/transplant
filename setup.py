@@ -37,7 +37,7 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
     ],
-    license='BSD 3-clause License',
+    license='BSD 3-clause',
     install_requires=['numpy', 'pyzmq', 'msgpack-python'],
     python_requires='>=3.4',
     requires=['matlab', 'libzmq'],

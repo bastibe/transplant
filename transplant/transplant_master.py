@@ -362,6 +362,14 @@ class MatlabProxyObject:
         return self.process.fieldnames(self)
 
     def __getattr__(self, name):
+        """Retrieve a value or function from the object.
+
+        Properties are returned as native Python objects or
+        :class:`MatlabProxyObject` objects.
+
+        Functions are returned as :class:`MatlabFunction` objects.
+
+        """
         m = self.process
         # if it's a property, just retrieve it
         if name in m.properties(self, nargout=1):
@@ -403,26 +411,40 @@ class MatlabProxyObject:
 
 
 class MatlabStruct(dict):
-    "Mark a dict to be decoded as struct instead of containers.map"
+    "Mark a dict to be decoded as struct instead of containers.Map"
     pass
 
 
 class MatlabFunction:
-    """A Proxy for a Matlab function.
-
-    Calling this function will transfer all function arguments from
-    Python to Matlab, and translate them to the appropriate Matlab
-    data structures.
-
-    Return values are translated the same way, and transferred back to
-    Python.
-
-    """
+    """A Proxy for a Matlab function."""
     def __init__(self, parent, fun):
         self._parent = parent
         self._fun = fun
 
     def __call__(self, *args, nargout=-1, **kwargs):
+        """Call the Matlab function.
+
+        Calling this function will transfer all function arguments
+        from Python to Matlab, and translate them to the appropriate
+        Matlab data structures.
+
+        Return values are translated the same way, and transferred
+        back to Python.
+
+        Parameters
+        ----------
+        nargout : int
+            Call the function in Matlab with this many output
+            arguments. If not given, will execute ``nargout(func)`` in
+            Matlab to figure out the correct number of output
+            arguments. If this fails, execute ``ans = func(...)``, and
+            return the value of ``ans``.
+        **kwargs : dict
+            Keyword arguments are transparently translated to Matlab's
+            key-value pairs. For example, ``matlab.struct(foo="bar")``
+            will be translated to ``struct('foo', 'bar')``.
+
+        """
         # serialize keyword arguments:
         args += sum(kwargs.items(), ())
         return self._parent._call(self._fun, args, nargout=nargout)
@@ -436,9 +458,23 @@ class Matlab(TransplantMaster):
     (optionally using user account ``user``), and then starting Matlab
     on that machine. For this to work, `address` must be reachable
     using SSH, ``matlab`` must be in the ``user``'s PATH, and
-    ``transplant_remote`` must be in Matlab's ``path`` and
-    ``messenger`` must be available on both the local and the remote
-    machine.
+    ``transplant_remote`` must be in Matlab's ``path`` and `libzmq`
+    must be available on the remote machine.
+
+    All Matlab errors are caught in Matlab, and re-raised as
+    :class:`TransplantError` in Python. Some Matlab errors can not be
+    caught with try-catch. In this case, Transplant will not be able
+    to get a backtrace, but will continue running (as part of
+    ``atexit`` in Matlab). If this happens often, performance might
+    degrade.
+
+    In case Matlab segfaults or otherwise terminates abnormally,
+    Transplant will raise a :class:`TransplantError`, and you will
+    need to create a new :class:`Matlab` instance.
+
+    ``SIGINT``/``KeyboardInterrupt`` will be forwarded to Matlab. Be
+    aware however, that some Matlab functions silently ignore
+    ``SIGINT``, and will continue running regardless.
 
     Parameters
     ----------
