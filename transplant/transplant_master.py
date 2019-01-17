@@ -153,7 +153,7 @@ class TransplantMaster:
 
         self._wait_socket(zmq.POLLIN)
         if self.msgformat == 'msgpack':
-            response = msgpack.unpackb(self.socket.recv(flags=zmq.NOBLOCK), encoding='utf-8')
+            response = msgpack.unpackb(self.socket.recv(flags=zmq.NOBLOCK), encoding='utf-8', max_bin_len=2**31-1)
         else:
             response = self.socket.recv_json(flags=zmq.NOBLOCK)
 
@@ -583,7 +583,7 @@ class Matlab(TransplantMaster):
             self.process.send_signal(SIGINT)
             # receive outstanding message to get ZMQ back in the right state
             if self.msgformat == 'msgpack':
-                response = msgpack.unpackb(self.socket.recv(), encoding='utf-8')
+                response = msgpack.unpackb(self.socket.recv(), encoding='utf-8', max_bin_len=2**31-1)
             else:
                 response = self.socket.recv_json()
             # continue with the exception
