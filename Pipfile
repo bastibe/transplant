@@ -6,7 +6,7 @@ name = "pypi"
 [packages]
 numpy = "*"
 pyzmq = "*"
-msgpack-python = "*"
+msgpack = "*"
 ipython = "*"
 pytest = "*"
 
