@@ -715,7 +715,7 @@ class Matlab(TransplantMaster):
         except:
             return []
 
-        search_dirs = re.compile('SEARCH_DIR\(([^)]*)\)').findall(output)
+        search_dirs = re.compile(r'SEARCH_DIR\(([^)]*)\)').findall(output)
         return [d.strip(' "') for d in search_dirs]
 
     def _read_ldsoconf(self, file):
