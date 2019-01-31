@@ -281,7 +281,7 @@ INSTALLATION
    zeromq if you use conda.
 
 2. Install Transplant using ``pip install transplant``. This will
-   install ``pyzmq``, ``numpy`` and ``msgpack-python`` as
+   install ``pyzmq``, ``numpy`` and ``msgpack`` as
    dependencies.
 
 If you want to run Transplant over the network, the remote Matlab has
