@@ -277,7 +277,7 @@ class TransplantMaster:
         if isinstance(data, str):
             out = np.fromstring(base64.b64decode(data.encode()), dtype)
         else:
-            out = np.fromstring(data, dtype)
+            out = np.frombuffer(data, dtype)
         shape = [int(n) for n in shape]; # numpy requires integer indices
         return out.reshape(*shape)
 
