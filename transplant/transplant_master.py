@@ -317,7 +317,8 @@ class TransplantMaster:
         row, col, value = (self._decode_matrix(d).ravel()
                            if d is not None else []
                            for d in data[2:])
-        return scipy.sparse.coo_matrix((value, (row, col)), shape=data[1])
+        shape = (int(d) for d in data[1]) # convert shape to int
+        return scipy.sparse.coo_matrix((value, (row, col)), shape=shape)
 
     def _encode_proxy(self, data):
         """Encode a ProxyObject as a special list.
