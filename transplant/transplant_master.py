@@ -94,6 +94,9 @@ class TransplantMaster:
 
     def _del_proxy(self, handle):
         """Tell the remote to forget about this proxy object."""
+        # ignore if remote already shut down:
+        if self.socket.closed:
+            return
         self.send_message('del_proxy', handle=handle)
 
     def __getattr__(self, name):

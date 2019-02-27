@@ -13,7 +13,7 @@ Make sure you have pip >= 9.0.1.
 
 setup(
     name='Transplant',
-    version='0.8.8',
+    version='0.8.9',
     description='Call Matlab from Python (requires Matlab)',
     author='Bastian Bechtold',
     author_email='basti@bastibe.de',
