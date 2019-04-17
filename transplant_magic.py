@@ -1,5 +1,5 @@
 from IPython.core.magic import Magics, magics_class
-from IPython.core.magic import line_magic, cell_magic
+from IPython.core.magic import line_magic, line_cell_magic
 
 
 @magics_class
@@ -8,6 +8,9 @@ class MatlabMagic(Magics):
 
     All variables assigned within the cell will be available in
     Python.
+    
+    All transplantable variables assingned in Python will be 
+    available in this cell.
 
     If you need to restart matlab, use %restart_matlab
 
@@ -18,16 +21,27 @@ class MatlabMagic(Magics):
         import transplant
         self.m = transplant.Matlab()
 
-    @cell_magic
-    def matlab(self, line, cell):
-        res = self.m.evalin('base', cell)
-        self.m.drawnow('update')
+    def _shell_user_globals_to_matlab_base_workspace(self):
+        for name, value in self.shell.user_global_ns.items():
+            if not name.startswith('_'):
+                try:
+                    setattr(self.m, name, value)
+                except TypeError:
+                    pass
+        
+    def _matlab_base_workspace_to_shell_user_globals(self):
         vars = self.m.evalin('base', 'who()', nargout=1)
         for var in vars:
             varname = str(var)
             value = getattr(self.m, varname)
             self.shell.user_global_ns[varname] = value
 
+    @line_cell_magic
+    def matlab(self, line, cell=None):
+        self._shell_user_globals_to_matlab_base_workspace()    
+        res = self.m.evalin('base', line or cell)
+        self.m.drawnow('update')
+        self._matlab_base_workspace_to_shell_user_globals()
         return res
 
     @line_magic
