@@ -384,6 +384,10 @@ FAQ
 * Does Transplant work in Python 2.7?
   No, it does not.
 
+* How to integrate Transplant with Jupyter?
+  Use the provided ``transplant_magic.py``, to get %%matlab cell
+  magic.
+
 
 SIMILAR PROGRAMS
 ----------------
