@@ -21,6 +21,7 @@ class MatlabMagic(Magics):
     @cell_magic
     def matlab(self, line, cell):
         res = self.m.evalin('base', cell)
+        self.m.drawnow('update')
         vars = self.m.evalin('base', 'who()', nargout=1)
         for var in vars:
             varname = str(var)
