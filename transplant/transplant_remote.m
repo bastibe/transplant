@@ -34,7 +34,7 @@ function transplant_remote(msgformat, url, zmqname, is_zombie)
     % since the onCleanup prevents direct exit, quit here after revival before
     % a new onCleanup is created:
     if should_die
-        quit('force')
+        return
     end
 
     try
