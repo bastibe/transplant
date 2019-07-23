@@ -1,0 +1,8 @@
+include LICENSE*
+include README.*
+include transplant_magic.py
+
+include readthedocs.yml
+
+graft docs transplant
+global-exclude *.py[cod] __pycache__
