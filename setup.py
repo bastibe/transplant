@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys
-from setuptools import setup
+from setuptools import find_packages, setup
 
 if sys.version_info < (3, 4):
     error = """
@@ -18,13 +18,13 @@ setup(
     author='Bastian Bechtold',
     author_email='basti@bastibe.de',
     url='https://github.com/bastibe/transplant',
-    packages=['transplant'],
+    include_package_data=True,
+    packages=find_packages(),
     package_data={'transplant': ['parsemsgpack.m', 'dumpmsgpack.m',
                                  'parsejson.m', 'dumpjson.m',
                                  'base64decode.m', 'base64encode.m',
                                  'transplant_remote.m', 'ZMQ.m',
-                                 'transplantzmq.h'],
-                  '': ['LICENSE', 'README.rst']},
+                                 'transplantzmq.h']},
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Science/Research',
