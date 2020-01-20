@@ -135,6 +135,8 @@ Input arguments are converted to Matlab data structures:
 +-----------------------------------+-------------------------------+
 | proxy object                      | original object               |
 +-----------------------------------+-------------------------------+
+| proxy function                    | original function             |
++-----------------------------------+-------------------------------+
 
 Return values are treated similarly:
 
@@ -171,7 +173,7 @@ intended.
 
     f = matlab.figure() # create a Figure object
     f.Visible = 'off' # modify a property of the Figure object
-    matlab.set(f, 'Visible', 'on') # pass the Figure object to a function
+    matlab.set(f, 'Visible', 'on') # pass the Figure object to a Matlab function
 
 In Matlab, some functions behave differently depending on the number
 of output arguments. By default, Transplant uses the Matlab function
@@ -188,6 +190,10 @@ which can be used in these cases: ``matlab.profile('on', nargout=0)``
 calls ``profile on`` with no output arguments. ``s, f, t, p =
 matlab.spectrogram(numpy.random.randn(1000), nargout=4)`` returns all
 four output arguments of ``spectrogram``.
+
+All other keyword arguments are transparently translated to key-value
+pairs in Matlab, i.e. ``matlab.struct(a=1, b=2)`` is another way of
+writing ``matlab.struct('a', 1, 'b', 2)``.
 
 When working with plots, note that the Matlab program does not wait
 for drawing on its own. Use ``matlab.drawnow()`` to make figures
