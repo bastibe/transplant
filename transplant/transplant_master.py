@@ -572,7 +572,7 @@ class Matlab(TransplantMaster):
 
     def exit(self):
         """Close the connection, and kill the process."""
-        super(self.__class__, self).exit()
+        super().exit()
         self.socket.close()
         self.context.term()
 
