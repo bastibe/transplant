@@ -211,7 +211,7 @@ function transplant_remote(msgformat, url, zmqname, is_zombie)
         elseif (isnumeric(value) && numel(value) ~= 0 && ...
             (numel(value) > 1 || ~isreal(value)))
             value = encode_matrix(value);
-        elseif (islogical(value) && numel(value) > 0)
+        elseif (islogical(value) && numel(value) > 1)
             value = encode_matrix(value);
         elseif isa(value, 'containers.Map')
             % containers.Map is a handle object, so we need to create a
