@@ -88,7 +88,9 @@ function transplant_remote(msgformat, url, zmqname, is_zombie)
                     % so that can't be used.
                     existance = evalin('base', ['exist(''' msg('name') ''')']);
                     % exist doesn't find methods, though.
-                    existance = existance | any(which(msg('name')));
+                    % exist returns 0 if the name does not exist and 7 if it is
+                    % a folder, which we are not interested in.
+                    existance = ~any(existance == [0, 7]) | any(which(msg('name')));
                     % value does not exist:
                     if ~existance
                         error('TRANSPLANT:novariable' , ...
