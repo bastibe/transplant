@@ -117,3 +117,14 @@ def test_docstring(matlab):
     assert 'ONES' in docstring
     classdocstring = type(matlab.ones).__doc__
     assert 'ONES' in classdocstring
+
+def test_put_logical_matrix(matlab):
+    matlab.bool_matrix = np.random.randint(2, size=(3, 4)).astype(np.bool)
+    assert np.all(matlab.size(matlab.bool_matrix) == (3, 4))
+    assert matlab.islogical(matlab.bool_matrix)
+
+def test_get_logical_matrix(matlab):
+    bool_matrix = matlab.eval("logical(randi(2, 3, 4) - 1)")
+    assert isinstance(bool_matrix, np.ndarray)
+    assert bool_matrix.shape == (3, 4)
+    assert bool_matrix.dtype == np.bool
