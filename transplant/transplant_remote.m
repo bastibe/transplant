@@ -211,6 +211,8 @@ function transplant_remote(msgformat, url, zmqname, is_zombie)
         elseif (isnumeric(value) && numel(value) ~= 0 && ...
             (numel(value) > 1 || ~isreal(value)))
             value = encode_matrix(value);
+        elseif (islogical(value) && numel(value) > 1)
+            value = encode_matrix(value);
         elseif isa(value, 'containers.Map')
             % containers.Map is a handle object, so we need to create a
             % new copy her in order to not change the original object.
@@ -315,7 +317,12 @@ function transplant_remote(msgformat, url, zmqname, is_zombie)
         value = permute(value, length(size(value)):-1:1);
         % convert to uint8 1-D array
         if isreal(value)
-            binary = typecast(value(:), 'uint8');
+            if islogical(value)
+                % convert logicals (bool) into one-byte-per-bit
+                binary = cast(value, 'uint8');
+            else
+                binary = typecast(value(:), 'uint8');
+            end
         else
             % convert [complex, complex] into [real, imag, real, imag]
             tmp = zeros(numel(value)*2, 1);
@@ -325,10 +332,6 @@ function transplant_remote(msgformat, url, zmqname, is_zombie)
             tmp(1:2:end) = real(value(:));
             tmp(2:2:end) = imag(value(:));
             binary = typecast(tmp, 'uint8');
-        end
-        if islogical(value)
-            % convert logicals (bool) into one-byte-per-bit
-            binary = cast(value, 'uint8');
         end
         % not all typecasts return column vectors, so use (:)
         if strcmp(msgformat, 'json')
