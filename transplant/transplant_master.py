@@ -692,7 +692,7 @@ class Matlab(TransplantMaster):
             extension = '.dylib'
         elif sys.platform == 'win32' or sys.platform == 'cygwin':
             # according to https://msdn.microsoft.com/en-us/library/windows/desktop/ms682586(v=vs.85).aspx
-            search_dirs = ((os.getenv('PATH') or '').split(':') +
+            search_dirs = ((os.getenv('PATH') or '').split(';') +
                            ['C:/Program Files/ZeroMQ*/bin'])
             extension = '.dll'
 
