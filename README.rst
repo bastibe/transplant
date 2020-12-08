@@ -45,6 +45,10 @@ All Matlab functions and objects can be accessed from Python.
 RECENT CHANGES
 --------------
 
+- Fixes for finding libzmq on Windows (Thank you, hardmstar)
+- Now correctly encodes bool ndarrays as logical arrays (thank you, Júlio)
+- Fixes working with Matlab packages (Thank you, dani-l)
+- Fixes recursion at Matlab shutdown (Thank you, dani-l)
 - Should now reliably raise an error if Matlab dies unexpectedly.
 - Keyword arguments are now automatically translated to string-value
   pairs in Matlab.
