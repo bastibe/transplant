@@ -525,11 +525,8 @@ class Matlab(TransplantMaster):
                 arguments += '-minimize',
         if not jvm and '-nojvm' not in arguments:
             arguments += '-nojvm',
-        paths = (os.path.dirname(__file__))
-        if addpath is not None:
-            for path in addpath:
-                tempath = str('\',\'' + path)
-                paths += tempath
+        paths = [os.path.dirname(__file__)] + addpath
+        paths_string = ','.join("'{}'".format(p) for p in paths)
 
         if address is None:
             if sys.platform == 'linux' or sys.platform == 'darwin':
@@ -543,9 +540,9 @@ class Matlab(TransplantMaster):
                 zmq_address = 'tcp://127.0.0.1:' + str(port)
 
             process_arguments = ([executable] + list(arguments) +
-                                 ['-r', "addpath('{}');cd('{}');"
+                                 ['-r', "addpath({});cd('{}');"
                                   "transplant_remote('{}','{}','{}');".format(
-                                      paths, os.getcwd(),
+                                      paths_string, os.getcwd(),
                                       msgformat, zmq_address, self._locate_libzmq()
 )])
         else:
