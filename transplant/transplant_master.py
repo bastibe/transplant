@@ -503,12 +503,14 @@ class Matlab(TransplantMaster):
         Whether to start Matlab with ``-nodesktop``, defaults to ``True``.
     jvm : bool
         Whether to start Matlab with ``-nojvm``, defaults to ``False``.
-
+    addpath : list
+        The paths of Matlab files to be added into Matlab path, defaults
+        to __file__.
     """
 
     ProxyObject = MatlabProxyObject
 
-    def __init__(self, executable='matlab', arguments=tuple(), msgformat='msgpack', address=None, user=None, print_to_stdout=True, desktop=False, jvm=True):
+    def __init__(self, executable='matlab', arguments=tuple(), msgformat='msgpack', address=None, user=None, print_to_stdout=True, desktop=False, jvm=True, addpath=list()):
         """Starts a Matlab instance and opens a communication channel."""
         if msgformat not in ['msgpack', 'json']:
             raise ValueError('msgformat must be "msgpack" or "json"')
@@ -523,6 +525,11 @@ class Matlab(TransplantMaster):
                 arguments += '-minimize',
         if not jvm and '-nojvm' not in arguments:
             arguments += '-nojvm',
+        paths = (os.path.dirname(__file__))
+        if addpath is not None:
+            for path in addpath:
+                tempath = str('\',\'' + path)
+                paths += tempath
 
         if address is None:
             if sys.platform == 'linux' or sys.platform == 'darwin':
@@ -538,7 +545,7 @@ class Matlab(TransplantMaster):
             process_arguments = ([executable] + list(arguments) +
                                  ['-r', "addpath('{}');cd('{}');"
                                   "transplant_remote('{}','{}','{}');".format(
-                                      os.path.dirname(__file__), os.getcwd(),
+                                      paths, os.getcwd(),
                                       msgformat, zmq_address, self._locate_libzmq()
 )])
         else:
