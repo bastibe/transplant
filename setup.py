@@ -38,8 +38,6 @@ setup(
     ],
     license='BSD 3-clause',
     install_requires=['numpy', 'pyzmq', 'msgpack'],
-    setup_requires=['pytest-runner'],
-    tests_require=['pytest', 'scipy'],
     python_requires='>=3.4',
     requires=['matlab', 'libzmq'],
     long_description=open('README.rst').read(),
